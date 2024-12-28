@@ -1,13 +1,8 @@
 "use client";
 
-import FetchDataSteps from "@/components/tutorial/fetch-data-steps";
-import { createClient } from "@/utils/supabase/server";
-import { InfoIcon } from "lucide-react";
-import { redirect } from "next/navigation";
-import { inter } from "@/components/typography/fonts";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
+import { useDropzone } from "react-dropzone";
 import { z } from "zod";
 
 import { Button } from "@/components/ui/button";
@@ -30,10 +25,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useCallback } from "react";
+
+const FIVE_MB = 5 * 1024 * 1024;
 
 const FormSchema = z.object({
   text: z.string(),
-  files: z.any(),
+  files: z
+    .array(z.instanceof(File))
+    .refine((files) => files.length <= 3, {
+      message: "You can only upload up to 3 files",
+    })
+    .refine((files) => files.some((file) => file.size <= FIVE_MB), {
+      message: "File size must be less than 5MB",
+    }),
   cadence: z.string(),
   repeat: z.string(),
 });
@@ -73,60 +78,99 @@ export default function ProtectedPage() {
   }
 
   return (
-    <div className="flex-1 w-full flex flex-col gap-12">
+    <div className="flex-1 w-full max-w-[520px] flex flex-col gap-12">
       <div className="w-full flex flex-row text-center justify-around font-bold text-4xl">
         {greeting}
       </div>
       <div className={`w-full flex flex-row justify-around`}>
-        {userName && <p>What would you like to learn about?</p>}
+        {userName && (
+          <p>
+            Just upload your content and we will deliver them to you in byte
+            sized texts at an interval of your choice.
+          </p>
+        )}
       </div>
       {userName && (
         <Form {...form}>
           <form
             onSubmit={form.handleSubmit(onSubmit)}
-            className="w-2/3 space-y-6"
+            className="w-full space-y-6 "
           >
+            <div>1. Add your content</div>
             <FormField
               control={form.control}
               name="text"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Text</FormLabel>
+                  <FormLabel>Upload</FormLabel>
                   <FormControl>
-                    <Input placeholder="shadcn" {...field} />
+                    <Input type="text" {...field} />
                   </FormControl>
                   <FormDescription>
-                    Paste any URLs or raw text here.
+                    Paste any raw text or URLs here.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
               name="files"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Upload</FormLabel>
-                  <FormControl>
-                    <Input type="file" {...field} />
-                  </FormControl>
-                  <FormDescription>Upload any files here.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              render={({ field }) => {
+                const onDrop = useCallback(
+                  (acceptedFiles: File[]) => {
+                    const currentItems = form.getValues("files");
+                    if (currentItems) {
+                      form.setValue("files", [
+                        ...currentItems,
+                        ...acceptedFiles,
+                      ]);
+                    } else {
+                      form.setValue("files", acceptedFiles);
+                    }
+                  },
+                  [field]
+                );
 
+                const { getRootProps, getInputProps, isDragActive } =
+                  useDropzone({ onDrop });
+
+                return (
+                  <div {...getRootProps()}>
+                    <input {...getInputProps()} />
+                    {isDragActive ? (
+                      <p>Drop the files here ...</p>
+                    ) : (
+                      <p>
+                        Drag 'n' drop some files here, or click to select files
+                      </p>
+                    )}
+                    <div>
+                      {field.value?.map((file: File) => (
+                        <div key={file.name}>{file.name}</div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }}
+            />
+            <div className="w-full flex flex-row justify-around">
+              {"AND/OR"}
+            </div>
+
+            <br />
+            <div>2. Choose Your Settings</div>
             <FormField
               control={form.control}
               name="cadence"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cadence</FormLabel>
+                  <FormLabel>
+                    How often would you like to receive texts from us?
+                  </FormLabel>
                   <FormControl>
                     <Select {...field}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger>
                         <SelectValue placeholder="Once Every..." />
                       </SelectTrigger>
                       <SelectContent>
@@ -140,23 +184,22 @@ export default function ProtectedPage() {
                       </SelectContent>
                     </Select>
                   </FormControl>
-                  <FormDescription>
-                    Choose the frequency to receive text messages from us.
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
             <FormField
               control={form.control}
               name="repeat"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Repeat</FormLabel>
+                  <FormLabel>
+                    How often would you like the information in these texts to
+                    repeat?
+                  </FormLabel>
                   <FormControl>
                     <Select {...field}>
-                      <SelectTrigger className="w-[180px]">
+                      <SelectTrigger>
                         <SelectValue placeholder="Repeat" />
                       </SelectTrigger>
                       <SelectContent>
@@ -165,21 +208,18 @@ export default function ProtectedPage() {
                           <SelectItem value="repeat-forever">
                             Forever
                           </SelectItem>
-                          <SelectItem value="repeat-once">Once</SelectItem>
                           <SelectItem value="do-not-repeat">Never</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
                   </FormControl>
-                  <FormDescription>
-                    Would you like text messages to repeat?
-                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            <Button type="submit">Submit</Button>
+            <div className="w-full flex flex-row justify-around">
+              <Button type="submit">Submit</Button>
+            </div>
           </form>
         </Form>
       )}
