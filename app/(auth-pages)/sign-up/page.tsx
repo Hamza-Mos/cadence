@@ -1,51 +1,140 @@
-import { signUpAction } from "@/app/actions";
-import { FormMessage, Message } from "@/components/form-message";
-import { SubmitButton } from "@/components/submit-button";
+"use client";
+
+import {
+  signUpWithPhone,
+  verifyPhoneOtp,
+  verifySignUpOtp,
+} from "@/app/actions";
+import { FormMessage } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { SmtpMessage } from "../smtp-message";
+import { SubmitButton } from "@/components/submit-button";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { PhoneInput } from "@/components/ui/phone-input";
 
-export default async function Signup(props: {
-  searchParams: Promise<Message>;
-}) {
-  const searchParams = await props.searchParams;
-  if ("message" in searchParams) {
-    return (
-      <div className="w-full flex-1 flex items-center h-screen sm:max-w-md justify-center gap-2 p-4">
-        <FormMessage message={searchParams} />
-      </div>
-    );
-  }
+export default function SignUp() {
+  const [step, setStep] = useState<"phone" | "verification">("phone");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState<{ success?: string; error?: string }>(
+    {}
+  );
+  const router = useRouter();
+
+  const handleSendCode = async (formData: FormData) => {
+    const result = await signUpWithPhone(formData);
+
+    if ("error" in result) {
+      setMessage({ error: result.error });
+    } else {
+      setMessage({ success: "Verification code sent" });
+      setPhone(result.phone);
+      setStep("verification");
+    }
+  };
+
+  const handleVerifyCode = async (formData: FormData) => {
+    formData.append("phone", phone);
+    const result = await verifySignUpOtp(formData);
+
+    if ("error" in result) {
+      setMessage({ error: result.error });
+    } else {
+      router.push("/protected");
+    }
+  };
 
   return (
-    <>
-      <form className="flex flex-col min-w-64 max-w-64 mx-auto">
-        <h1 className="text-2xl font-medium">Sign up</h1>
-        <p className="text-sm text text-foreground">
-          Already have an account?{" "}
-          <Link className="text-primary font-medium underline" href="/sign-in">
-            Sign in
-          </Link>
-        </p>
-        <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
-          <Label htmlFor="email">Email</Label>
-          <Input name="email" placeholder="you@example.com" required />
-          <Label htmlFor="password">Password</Label>
-          <Input
-            type="password"
-            name="password"
-            placeholder="Your password"
-            minLength={6}
-            required
-          />
-          <SubmitButton formAction={signUpAction} pendingText="Signing up...">
-            Sign up
+    <div className="flex flex-col min-w-96 max-w-96 mx-auto">
+      <h1 className="text-2xl font-medium">Sign up</h1>
+      <p className="text-sm text text-foreground">
+        Already have an account?{" "}
+        <Link className="text-primary font-medium underline" href="/sign-in">
+          Sign in
+        </Link>
+      </p>
+
+      {step === "phone" && (
+        <form
+          action={handleSendCode}
+          className="flex flex-col gap-2 [&>input]:mb-3 mt-8"
+        >
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="firstName">First Name</Label>
+            <Input
+              id="firstName"
+              name="firstName"
+              placeholder="First name"
+              required
+              autoComplete="given-name"
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="lastName">Last Name</Label>
+            <Input
+              id="lastName"
+              name="lastName"
+              placeholder="Last name"
+              required
+              autoComplete="family-name"
+            />
+          </div>
+
+          <Label>Phone Number</Label>
+          <PhoneInput />
+          <SubmitButton pendingText="Sending code...">
+            Send verification code
           </SubmitButton>
-          <FormMessage message={searchParams} />
-        </div>
-      </form>
-      <SmtpMessage />
-    </>
+          <FormMessage
+            message={
+              message.error
+                ? { error: message.error }
+                : message.success
+                  ? { success: message.success }
+                  : { success: "" }
+            }
+          />
+        </form>
+      )}
+
+      {step === "verification" && (
+        <form
+          action={handleVerifyCode}
+          className="flex flex-col gap-2 [&>input]:mb-3 mt-8"
+        >
+          <p className="text-sm text-foreground">
+            Enter the verification code sent to {phone}
+          </p>
+          <Label htmlFor="token">Verification Code</Label>
+          <Input
+            name="token"
+            placeholder="123456"
+            required
+            pattern="^\d{6}$"
+            title="Please enter the 6-digit verification code"
+            maxLength={6}
+          />
+          <SubmitButton pendingText="Verifying...">Verify Code</SubmitButton>
+          <button
+            type="button"
+            className="text-sm text-primary underline text-center"
+            onClick={() => setStep("phone")}
+          >
+            Use different phone number
+          </button>
+          <FormMessage
+            message={
+              message.error
+                ? { error: message.error }
+                : message.success
+                  ? { success: message.success }
+                  : { success: "" }
+            }
+          />
+        </form>
+      )}
+    </div>
   );
 }
