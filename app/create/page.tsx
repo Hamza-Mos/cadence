@@ -26,6 +26,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useCallback } from "react";
+import DropZoneUI from "@/components/dropzone";
+import FileTile from "@/components/filetile";
+import { randomUUID } from "crypto";
 
 const FIVE_MB = 5 * 1024 * 1024;
 
@@ -38,7 +41,15 @@ const FormSchema = z.object({
     })
     .refine((files) => files.some((file) => file.size <= FIVE_MB), {
       message: "File size must be less than 5MB",
-    }),
+    })
+    .refine(
+      (files) =>
+        new Set(files.map((file) => file.name)).size ===
+        files.map((file) => file.name).length,
+      {
+        message: "Duplicate files are not allowed",
+      }
+    ),
   cadence: z.string(),
   repeat: z.string(),
 });
@@ -59,9 +70,10 @@ export default function ProtectedPage() {
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
-      text: "www.apple.com",
-      cadence: "Once A Day",
-      repeat: "Never",
+      text: "",
+      files: [],
+      cadence: "receive-daily",
+      repeat: "do-not-repeat",
     },
   });
 
@@ -84,9 +96,9 @@ export default function ProtectedPage() {
       </div>
       <div className={`w-full flex flex-row justify-around`}>
         {userName && (
-          <p>
-            Just upload your content and we will deliver them to you in byte
-            sized texts at an interval of your choice.
+          <p className="text-center">
+            Upload your content and we will deliver them to you in byte sized
+            texts at an interval of your choice.
           </p>
         )}
       </div>
@@ -113,6 +125,10 @@ export default function ProtectedPage() {
                 </FormItem>
               )}
             />
+            <div className="w-full flex flex-row justify-around">
+              {"AND/OR"}
+            </div>
+
             <FormField
               control={form.control}
               name="files"
@@ -132,32 +148,44 @@ export default function ProtectedPage() {
                   [field]
                 );
 
+                const onDelete = useCallback(
+                  (file: File) => {
+                    const currentItems = form.getValues("files");
+                    if (currentItems) {
+                      form.setValue(
+                        "files",
+                        currentItems.filter(
+                          (item: File) => item.name !== file.name
+                        )
+                      );
+                    }
+                  },
+                  [field]
+                );
+
                 const { getRootProps, getInputProps, isDragActive } =
                   useDropzone({ onDrop });
 
                 return (
-                  <div {...getRootProps()}>
-                    <input {...getInputProps()} />
-                    {isDragActive ? (
-                      <p>Drop the files here ...</p>
-                    ) : (
-                      <p>
-                        Drag 'n' drop some files here, or click to select files
-                      </p>
-                    )}
-                    <div>
+                  <div>
+                    <div {...getRootProps()}>
+                      <input {...getInputProps()} />
+                      <DropZoneUI isDragActive={isDragActive} />
+                    </div>
+                    <br />
+                    <div className="w-full flex flex-col justify-around gap-4">
                       {field.value?.map((file: File) => (
-                        <div key={file.name}>{file.name}</div>
+                        <FileTile
+                          key={file.name}
+                          file={file}
+                          onDelete={onDelete}
+                        />
                       ))}
                     </div>
                   </div>
                 );
               }}
             />
-            <div className="w-full flex flex-row justify-around">
-              {"AND/OR"}
-            </div>
-
             <br />
             <div>2. Choose Your Settings</div>
             <FormField
@@ -169,17 +197,17 @@ export default function ProtectedPage() {
                     How often would you like to receive texts from us?
                   </FormLabel>
                   <FormControl>
-                    <Select {...field}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Once Every..." />
+                        <SelectValue {...field} placeholder="Once Every..." />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
                           <SelectLabel>Cadence</SelectLabel>
-                          <SelectItem value="receive-daily">Day</SelectItem>
-                          <SelectItem value="receive-12">12 Hours</SelectItem>
-                          <SelectItem value="receive-6">6 Hours</SelectItem>
-                          <SelectItem value="receive-1">1 Hour</SelectItem>
+                          <SelectItem value="receive-daily">day</SelectItem>
+                          <SelectItem value="receive-12">12 hours</SelectItem>
+                          <SelectItem value="receive-6">6 hours</SelectItem>
+                          <SelectItem value="receive-1">1 hour</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
@@ -198,17 +226,17 @@ export default function ProtectedPage() {
                     repeat?
                   </FormLabel>
                   <FormControl>
-                    <Select {...field}>
+                    <Select onValueChange={field.onChange} value={field.value}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Repeat" />
+                        <SelectValue {...field} placeholder="Repeat..." />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectGroup>
                           <SelectLabel>Repeat</SelectLabel>
                           <SelectItem value="repeat-forever">
-                            Forever
+                            forever
                           </SelectItem>
-                          <SelectItem value="do-not-repeat">Never</SelectItem>
+                          <SelectItem value="do-not-repeat">never</SelectItem>
                         </SelectGroup>
                       </SelectContent>
                     </Select>
