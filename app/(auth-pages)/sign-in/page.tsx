@@ -1,44 +1,113 @@
-import { signInAction } from "@/app/actions";
-import { FormMessage, Message } from "@/components/form-message";
-import { SubmitButton } from "@/components/submit-button";
+"use client";
+
+import { signInWithPhone, verifyPhoneOtp } from "@/app/actions";
+import { FormMessage } from "@/components/form-message";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PhoneInput } from "@/components/ui/phone-input";
 import Link from "next/link";
+import { SubmitButton } from "@/components/submit-button";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
 
-export default async function Login(props: { searchParams: Promise<Message> }) {
-  const searchParams = await props.searchParams;
+export default function Login() {
+  const [step, setStep] = useState<"phone" | "verification">("phone");
+  const [phone, setPhone] = useState("");
+  const [message, setMessage] = useState<{ success?: string; error?: string }>(
+    {}
+  );
+  const router = useRouter();
+
+  const handleSendCode = async (formData: FormData) => {
+    const result = await signInWithPhone(formData);
+
+    if ("error" in result) {
+      setMessage({ error: result.error });
+    } else {
+      setMessage({ success: "Verification code sent" });
+      setPhone(result.phone);
+      setStep("verification");
+    }
+  };
+
+  const handleVerifyCode = async (formData: FormData) => {
+    formData.append("phone", phone);
+    const result = await verifyPhoneOtp(formData);
+
+    if ("error" in result) {
+      setMessage({ error: result.error });
+    }
+    // Successful verification will handle redirect in the server action
+  };
+
   return (
-    <form className="flex-1 flex flex-col min-w-64">
+    <div className="flex flex-col min-w-96 max-w-96 mx-auto">
       <h1 className="text-2xl font-medium">Sign in</h1>
       <p className="text-sm text-foreground">
         Don't have an account?{" "}
-        <Link className="text-foreground font-medium underline" href="/sign-up">
+        <Link className="text-primary font-medium underline" href="/sign-up">
           Sign up
         </Link>
       </p>
-      <div className="flex flex-col gap-2 [&>input]:mb-3 mt-8">
-        <Label htmlFor="email">Email</Label>
-        <Input name="email" placeholder="you@example.com" required />
-        <div className="flex justify-between items-center">
-          <Label htmlFor="password">Password</Label>
-          <Link
-            className="text-xs text-foreground underline"
-            href="/forgot-password"
+
+      {step === "phone" && (
+        <form
+          action={handleSendCode}
+          className="flex flex-col gap-2 [&>input]:mb-3 mt-8"
+        >
+          <Label>Phone Number</Label>
+          <PhoneInput />
+          <SubmitButton pendingText="Sending code...">
+            Send verification code
+          </SubmitButton>
+          <FormMessage
+            message={
+              message.error
+                ? { error: message.error }
+                : message.success
+                  ? { success: message.success }
+                  : { success: "" }
+            }
+          />
+        </form>
+      )}
+
+      {step === "verification" && (
+        <form
+          action={handleVerifyCode}
+          className="flex flex-col gap-2 [&>input]:mb-3 mt-8"
+        >
+          <p className="text-sm text-foreground">
+            Enter the verification code sent to {phone}
+          </p>
+          <Label htmlFor="token">Verification Code</Label>
+          <Input
+            name="token"
+            placeholder="123456"
+            required
+            pattern="^\d{6}$"
+            title="Please enter the 6-digit verification code"
+            maxLength={6}
+          />
+          <SubmitButton pendingText="Verifying...">Verify Code</SubmitButton>
+          <button
+            type="button"
+            className="text-sm text-primary underline text-center"
+            onClick={() => setStep("phone")}
           >
-            Forgot Password?
-          </Link>
-        </div>
-        <Input
-          type="password"
-          name="password"
-          placeholder="Your password"
-          required
-        />
-        <SubmitButton pendingText="Signing In..." formAction={signInAction}>
-          Sign in
-        </SubmitButton>
-        <FormMessage message={searchParams} />
-      </div>
-    </form>
+            Use different phone number
+          </button>
+          <FormMessage
+            message={
+              message.error
+                ? { error: message.error }
+                : message.success
+                  ? { success: message.success }
+                  : { success: "" }
+            }
+          />
+        </form>
+      )}
+    </div>
   );
 }

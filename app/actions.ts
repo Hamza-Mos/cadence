@@ -5,6 +5,181 @@ import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
+export async function signUpWithPhone(formData: FormData) {
+  const supabase = await createClient();
+  const areaCode = formData.get("areaCode") as string;
+  const phoneNumber = formData.get("phoneNumber") as string;
+  const firstName = formData.get("firstName") as string;
+  const lastName = formData.get("lastName") as string;
+  const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
+
+  try {
+    // first check if a user with this phone number exists
+    const { data: existingUser, error: lookupError } = await supabase
+      .from("users")
+      .select("phone")
+      .eq("phone", phoneNumber)
+      .single();
+
+    if (existingUser) {
+      return {
+        error:
+          "An account with this phone number already exists. Please sign in instead.",
+      };
+    }
+
+    const { data, error } = await supabase.auth.signInWithOtp({
+      phone: fullPhone,
+      options: {
+        data: {
+          phone_number: phoneNumber,
+          first_name: firstName,
+          last_name: lastName,
+          area_code: areaCode,
+        },
+      },
+    });
+
+    if (error) {
+      return {
+        error: error.message,
+      };
+    }
+
+    return {
+      success: true,
+      phone: fullPhone,
+    };
+  } catch (error) {
+    return {
+      error: "Failed to send verification code",
+    };
+  }
+}
+
+export async function signInWithPhone(formData: FormData) {
+  const supabase = await createClient();
+  const areaCode = formData.get("areaCode") as string;
+  const phoneNumber = formData.get("phoneNumber") as string;
+  const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
+
+  try {
+    const { data, error } = await supabase.auth.signInWithOtp({
+      phone: fullPhone,
+    });
+
+    if (error) {
+      return {
+        error: error.message,
+      };
+    }
+
+    return {
+      success: true,
+      phone: fullPhone,
+    };
+  } catch (error) {
+    return {
+      error: "Failed to send verification code",
+    };
+  }
+}
+
+// For sign in - keep the existing verifyPhoneOtp
+export async function verifyPhoneOtp(formData: FormData) {
+  const supabase = await createClient();
+  const phone = formData.get("phone") as string;
+  const token = formData.get("token") as string;
+
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      phone: phone.startsWith("+") ? phone.slice(1) : phone,
+      token,
+      type: "sms",
+    });
+
+    if (error) {
+      console.log("Error: ", error);
+      return {
+        error: error.message,
+      };
+    }
+  } catch (error) {
+    return {
+      error: "Failed to verify code",
+    };
+  }
+
+  return redirect("/protected");
+}
+
+// New action for sign up verification
+export async function verifySignUpOtp(formData: FormData) {
+  const supabase = await createClient();
+  const phone = formData.get("phone") as string;
+  const token = formData.get("token") as string;
+
+  try {
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      phone: phone.startsWith("+") ? phone.slice(1) : phone,
+      token,
+      type: "sms",
+    });
+
+    if (verifyError) {
+      return {
+        error: verifyError.message,
+      };
+    }
+
+    // Get current user after verification
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return {
+        error: "Failed to get user details",
+      };
+    }
+
+    const metadata = user.user_metadata;
+
+    const { error: profileError } = await supabase.from("users").insert({
+      id: user.id,
+      first_name: metadata.first_name,
+      last_name: metadata.last_name,
+      area_code: metadata.area_code,
+      phone: metadata.phone_number,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    if (profileError) {
+      console.error("User creation error:", profileError);
+      return {
+        error: "Failed to create user profile",
+      };
+    }
+  } catch (error) {
+    console.error("Verification error:", error);
+    return {
+      error: "Failed to verify code",
+    };
+  }
+
+  return redirect("/protected");
+}
+
+export const completeSignup = async (formData: FormData) => {
+  console.log(`form data: ${formData}`);
+
+  return {
+    success: "Done!",
+  };
+};
+
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
   const password = formData.get("password")?.toString();
@@ -15,7 +190,7 @@ export const signUpAction = async (formData: FormData) => {
     return encodedRedirect(
       "error",
       "/sign-up",
-      "Email and password are required",
+      "Email and password are required"
     );
   }
 
@@ -34,7 +209,7 @@ export const signUpAction = async (formData: FormData) => {
     return encodedRedirect(
       "success",
       "/sign-up",
-      "Thanks for signing up! Please check your email for a verification link.",
+      "Thanks for signing up! Please check your email for a verification link."
     );
   }
 };
@@ -75,7 +250,7 @@ export const forgotPasswordAction = async (formData: FormData) => {
     return encodedRedirect(
       "error",
       "/forgot-password",
-      "Could not reset password",
+      "Could not reset password"
     );
   }
 
@@ -86,7 +261,7 @@ export const forgotPasswordAction = async (formData: FormData) => {
   return encodedRedirect(
     "success",
     "/forgot-password",
-    "Check your email for a link to reset your password.",
+    "Check your email for a link to reset your password."
   );
 };
 
@@ -100,7 +275,7 @@ export const resetPasswordAction = async (formData: FormData) => {
     encodedRedirect(
       "error",
       "/protected/reset-password",
-      "Password and confirm password are required",
+      "Password and confirm password are required"
     );
   }
 
@@ -108,7 +283,7 @@ export const resetPasswordAction = async (formData: FormData) => {
     encodedRedirect(
       "error",
       "/protected/reset-password",
-      "Passwords do not match",
+      "Passwords do not match"
     );
   }
 
@@ -120,7 +295,7 @@ export const resetPasswordAction = async (formData: FormData) => {
     encodedRedirect(
       "error",
       "/protected/reset-password",
-      "Password update failed",
+      "Password update failed"
     );
   }
 
