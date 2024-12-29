@@ -85,7 +85,6 @@ export async function signInWithPhone(formData: FormData) {
   }
 }
 
-// For sign in - keep the existing verifyPhoneOtp
 export async function verifyPhoneOtp(formData: FormData) {
   const supabase = await createClient();
   const phone = formData.get("phone") as string;
@@ -179,6 +178,94 @@ export const completeSignup = async (formData: FormData) => {
     success: "Done!",
   };
 };
+
+export async function requestPhoneChange(formData: FormData) {
+  const supabase = await createClient();
+  const areaCode = formData.get("areaCode") as string;
+  const phoneNumber = formData.get("phoneNumber") as string;
+  const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
+
+  try {
+    const { data, error } = await supabase.auth.updateUser({
+      phone: fullPhone,
+    });
+
+    if (error) {
+      return {
+        error: error.message,
+      };
+    }
+
+    return {
+      success: true,
+      phone: fullPhone,
+    };
+  } catch (error) {
+    return {
+      error: "Failed to initiate phone number change",
+    };
+  }
+}
+
+export async function verifyPhoneChange(formData: FormData) {
+  const supabase = await createClient();
+  const phone = formData.get("phone") as string;
+  const token = formData.get("token") as string;
+
+  try {
+    // First verify the OTP
+    const { data, error: verifyError } = await supabase.auth.verifyOtp({
+      phone: phone.startsWith("+") ? phone.slice(1) : phone,
+      token,
+      type: "phone_change",
+    });
+
+    if (verifyError) {
+      return {
+        error: verifyError.message,
+      };
+    }
+
+    // Get current user after verification
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return {
+        error: "Failed to get user details",
+      };
+    }
+
+    // Update the users table with new phone number
+    const areaCode = phone.split("+")[1].slice(0, -10); // Extract area code
+    const phoneNumber = phone.slice(-10); // Get last 10 digits
+
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({
+        phone: phoneNumber,
+        area_code: areaCode,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id);
+
+    if (updateError) {
+      console.error("Failed to update user table:", updateError);
+      return {
+        error: "Failed to update user profile",
+      };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Phone change error:", error);
+    return {
+      error: "Failed to change phone number",
+    };
+  }
+}
 
 export const signUpAction = async (formData: FormData) => {
   const email = formData.get("email")?.toString();
