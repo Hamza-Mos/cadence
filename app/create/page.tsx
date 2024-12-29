@@ -28,6 +28,9 @@ import {
 import { useCallback } from "react";
 import DropZoneUI from "@/components/dropzone";
 import FileTile from "@/components/filetile";
+import { randomUUID } from "crypto";
+import { createClient } from "@/utils/supabase/client";
+import { redirect } from "next/navigation";
 
 const FIVE_MB = 5 * 1024 * 1024;
 
@@ -53,18 +56,18 @@ const FormSchema = z.object({
   repeat: z.string(),
 });
 
-export default function Create() {
-  //   const supabase = await createClient();
+export default async function ProtectedPage() {
+  const supabase = await createClient();
 
-  //   const {
-  //     data: { user },
-  //   } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  //   if (!user) {
-  //     return redirect("/sign-in");
-  //   }
+  if (!user) {
+    return redirect("/sign-in");
+  }
 
-  const userName = "Suraj";
+  const userName = user.app_metadata.first_name;
 
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
