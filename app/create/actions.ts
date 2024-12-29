@@ -29,17 +29,17 @@ const cleanText = (text: string): string => {
 const splitIntoChunks = async (text: string): Promise<string[]> => {
   const systemPrompt = `You are an expert at breaking down complex information into simple, engaging text messages. Your task is to:
     1. Break down the given text into bite-sized chunks of 3-5 sentences each
-    2. Make each chunk focus on a single concept or topic
-    3. Write in a casual, text-message friendly style while keeping the information accurate
-    4. Ensure each chunk is self-contained and easily understood
+    2. Make each chunk focus on a single concept, topic, idea, or quote.
+    3. Write in a casual, text-message friendly style while keeping the information accurate.
+    4. Ensure each chunk is self-contained and easily understood,
     5. Use simple language and explanatory analogies where helpful
     6. Keep each chunk under 1000 characters
-    7. Remove any unnecessary information or redundant content
-    8. Make the information memorable and easy to understand
-    9. If the text is instructional, break it into clear, actionable steps
-    10. Maintain a friendly, conversational tone
+    7. Remove any unnecessary information or redundant content - this includes information about the author, any small talk, introductory content etc. that doesn't have meaningful informational value.
+    8. Make the information memorable and easy to understand.
+    9. If the text is instructional, break it into clear, actionable steps.
+    10. Maintain a friendly, conversational tone.
   
-  Output format should be a series of chunks separated by "|||". Each chunk should be a self-contained message.
+  Output format should be a series of chunks separated by "|||". Each chunk should be a self-contained message. Do not include a message that introduces the topic, remember each message should have some informational value.
   
   For example, if given a technical article about photosynthesis, good chunks would be:
   "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves. Pretty neat how nature figured that out! 🌞" ||| "💧 Water plays a huge role too! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food! It's like they're running their own tiny food factory 🏭"`;
