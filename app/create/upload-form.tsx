@@ -178,55 +178,72 @@ export default function UploadForm({ initialUserName }: UploadFormProps) {
           <FormField
             control={form.control}
             name="files"
-            render={({ field }) => {
+            render={({ field, fieldState }) => {
               const onDrop = useCallback(
                 (acceptedFiles: File[]) => {
-                  const currentItems = form.getValues("files");
-                  if (currentItems) {
-                    form.setValue("files", [...currentItems, ...acceptedFiles]);
-                  } else {
-                    form.setValue("files", acceptedFiles);
-                  }
+                  const currentItems = form.getValues("files") || [];
+                  const newFiles = [...currentItems, ...acceptedFiles];
+                  form.setValue("files", newFiles);
+                  // Trigger validation immediately after setting new files
+                  form.trigger("files");
                 },
                 [form]
               );
 
               const onDelete = useCallback(
-                (file: File) => {
+                (filename: string) => {
                   const currentItems = form.getValues("files");
                   if (currentItems) {
-                    form.setValue(
-                      "files",
-                      currentItems.filter(
-                        (item: File) => item.name !== file.name
-                      )
+                    const newFiles = currentItems.filter(
+                      (item: File) => item.name !== filename
                     );
+                    form.setValue("files", newFiles);
+                    // Trigger validation after deleting files
+                    form.trigger("files");
                   }
                 },
                 [form]
               );
 
               const { getRootProps, getInputProps, isDragActive } = useDropzone(
-                { onDrop }
+                {
+                  onDrop,
+                  // Add validation on drop
+                  onDropRejected: () => {
+                    form.setError("files", {
+                      type: "manual",
+                      message: "One or more files were rejected",
+                    });
+                  },
+                }
               );
 
               return (
-                <div>
-                  <div {...getRootProps()}>
-                    <input {...getInputProps()} />
-                    <DropZoneUI isDragActive={isDragActive} />
+                <FormItem>
+                  <div>
+                    <div {...getRootProps()}>
+                      <input {...getInputProps()} />
+                      <DropZoneUI isDragActive={isDragActive} />
+                    </div>
+                    <br />
+                    <div className="w-full flex flex-col justify-around gap-4">
+                      {field.value?.map((file: File) => (
+                        <FileTile
+                          key={file.name}
+                          filename={file.name}
+                          filesize={file.size}
+                          onDelete={onDelete}
+                        />
+                      ))}
+                    </div>
+                    {/* Add error message display */}
+                    {fieldState.error && (
+                      <FormMessage className="text-red-500 mt-2">
+                        {fieldState.error.message}
+                      </FormMessage>
+                    )}
                   </div>
-                  <br />
-                  <div className="w-full flex flex-col justify-around gap-4">
-                    {field.value?.map((file: File) => (
-                      <FileTile
-                        key={file.name}
-                        file={file}
-                        onDelete={onDelete}
-                      />
-                    ))}
-                  </div>
-                </div>
+                </FormItem>
               );
             }}
           />
