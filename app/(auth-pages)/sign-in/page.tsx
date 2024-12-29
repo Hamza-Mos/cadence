@@ -41,7 +41,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex flex-col min-w-96 max-w-96 mx-auto">
+    <div className="flex flex-col min-w-96 max-w-96 mx-auto py-32">
       <h1 className="text-2xl font-medium">Sign in</h1>
       <p className="text-sm text-foreground">
         Don't have an account?{" "}
@@ -75,11 +75,12 @@ export default function Login() {
       {step === "verification" && (
         <form
           action={handleVerifyCode}
-          className="flex flex-col gap-2 [&>input]:mb-3 mt-8"
+          className="flex flex-col gap-4 [&>input]:mb-3 mt-8"
         >
           <p className="text-sm text-foreground">
             Enter the verification code sent to {phone}
           </p>
+          <br />
           <Label htmlFor="token">Verification Code</Label>
           <Input
             name="token"
@@ -97,6 +98,7 @@ export default function Login() {
           >
             Use different phone number
           </button>
+          <br />
           <FormMessage
             message={
               message.error

@@ -58,7 +58,7 @@ export default function SignUp() {
       {step === "phone" && (
         <form
           action={handleSendCode}
-          className="flex flex-col gap-2 [&>input]:mb-3 mt-8"
+          className="flex flex-col gap-4 [&>input]:mb-3 mt-8"
         >
           <div className="flex flex-col gap-2">
             <Label htmlFor="firstName">First Name</Label>
@@ -81,12 +81,14 @@ export default function SignUp() {
               autoComplete="family-name"
             />
           </div>
-
-          <Label>Phone Number</Label>
-          <PhoneInput />
+          <div className="flex flex-col gap-2">
+            <Label>Phone Number</Label>
+            <PhoneInput />
+          </div>
           <SubmitButton pendingText="Sending code...">
             Send verification code
           </SubmitButton>
+          <br />
           <FormMessage
             message={
               message.error
@@ -107,6 +109,7 @@ export default function SignUp() {
           <p className="text-sm text-foreground">
             Enter the verification code sent to {phone}
           </p>
+          <br />
           <Label htmlFor="token">Verification Code</Label>
           <Input
             name="token"
@@ -124,6 +127,7 @@ export default function SignUp() {
           >
             Use different phone number
           </button>
+          <br />
           <FormMessage
             message={
               message.error

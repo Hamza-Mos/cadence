@@ -28,7 +28,6 @@ import {
 import { useCallback } from "react";
 import DropZoneUI from "@/components/dropzone";
 import FileTile from "@/components/filetile";
-import { randomUUID } from "crypto";
 
 const FIVE_MB = 5 * 1024 * 1024;
 
@@ -98,7 +97,7 @@ export default function Create() {
         {userName && (
           <p className="text-center">
             Upload your content and we will deliver them to you in byte sized
-            texts at an interval of your choice.
+            texts at a cadence of your choice.
           </p>
         )}
       </div>
