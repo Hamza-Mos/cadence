@@ -3,19 +3,12 @@
 import * as cheerio from "cheerio";
 import pdfParse from "pdf-parse";
 import { createClient } from "@/utils/supabase/server";
+import OpenAI from "openai";
 
-export async function getUser() {
-  try {
-    const supabase = await createClient();
-    const user = await supabase.auth.getUser();
-    return user.data.user;
-  } catch (error) {
-    console.error("Error getting user:", error);
-    throw new Error("Failed to get user details");
-  }
-}
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-// Utility function to clean text
 const cleanText = (text: string): string => {
   return text
     .replace(/\s+/g, " ") // Replace multiple spaces with single space
@@ -33,33 +26,114 @@ const cleanText = (text: string): string => {
     .trim();
 };
 
-// Utility function to split text into chunks
-const splitIntoChunks = (text: string, maxLength: number = 500): string[] => {
-  const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
-  const chunks: string[] = [];
-  let currentChunk = "";
+const splitIntoChunks = async (text: string): Promise<string[]> => {
+  const systemPrompt = `You are an expert at breaking down complex information into simple, engaging text messages. Your task is to:
+    1. Break down the given text into bite-sized chunks of 3-5 sentences each
+    2. Make each chunk focus on a single concept or topic
+    3. Write in a casual, text-message friendly style while keeping the information accurate
+    4. Ensure each chunk is self-contained and easily understood
+    5. Use simple language and explanatory analogies where helpful
+    6. Keep each chunk under 500 characters
+    7. Remove any unnecessary information or redundant content
+    8. Make the information memorable and easy to understand
+    9. If the text is instructional, break it into clear, actionable steps
+    10. Maintain a friendly, conversational tone
+  
+  Output format should be a series of chunks separated by "|||". Each chunk should be a self-contained message.
+  
+  For example, if given a technical article about photosynthesis, good chunks would be:
+  "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves. Pretty neat how nature figured that out! 🌞" ||| "💧 Water plays a huge role too! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food! It's like they're running their own tiny food factory 🏭"`;
 
-  for (const sentence of sentences) {
-    if ((currentChunk + sentence).length <= maxLength) {
-      currentChunk += sentence;
-    } else {
-      if (currentChunk) chunks.push(currentChunk.trim());
-      currentChunk = sentence;
+  try {
+    // split text into smaller segments if it's too long
+    const maxCharsPerRequest = 4000; // safe limit for context window
+    const textSegments = [];
+    for (let i = 0; i < text.length; i += maxCharsPerRequest) {
+      textSegments.push(text.slice(i, i + maxCharsPerRequest));
     }
-  }
 
-  if (currentChunk) chunks.push(currentChunk.trim());
-  return chunks;
+    let allChunks: string[] = [];
+
+    // process each segment
+    for (const segment of textSegments) {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4-1106-preview", // need to experiment with different models
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: `Please break this text into engaging, informative chunks that feel like text messages: ${segment}`,
+          },
+        ],
+        temperature: 0.7, // balanced between creativity and consistency
+        max_tokens: 2000,
+      });
+
+      const response = completion.choices[0]?.message?.content;
+
+      if (!response) {
+        console.warn("No response from GPT for segment");
+        continue;
+      }
+
+      // split response into chunks and add to collection
+      const newChunks = response
+        .split("|||")
+        .map((chunk) => chunk.trim())
+        .filter((chunk) => chunk.length > 0);
+      allChunks = [...allChunks, ...newChunks];
+    }
+
+    // Validate chunks
+    allChunks = allChunks.filter((chunk) => {
+      // ensure each chunk is within size limits and has actual content
+      return (
+        chunk.length > 0 &&
+        chunk.length <= 500 &&
+        chunk.split(/[.!?]+/).length >= 2
+      ); // at least 2 sentences
+    });
+
+    if (allChunks.length === 0) {
+      // fallback to simple chunking if GPT fails
+      console.warn("GPT chunking failed, falling back to simple chunking");
+      return text
+        .split(/[.!?]+/)
+        .reduce((acc: string[], sentence: string, i: number) => {
+          if (i % 3 === 0) acc.push(sentence + ".");
+          else if (acc.length > 0) acc[acc.length - 1] += " " + sentence + ".";
+          return acc;
+        }, [])
+        .filter((chunk) => chunk.trim().length > 0);
+    }
+
+    console.log("all chunks: ", allChunks);
+
+    return allChunks;
+  } catch (error) {
+    console.error("Error in GPT text chunking:", error);
+    // fallback to simple chunking
+    return text
+      .split(/[.!?]+/)
+      .reduce((acc: string[], sentence: string, i: number) => {
+        if (i % 3 === 0) acc.push(sentence + ".");
+        else if (acc.length > 0) acc[acc.length - 1] += " " + sentence + ".";
+        return acc;
+      }, [])
+      .filter((chunk) => chunk.trim().length > 0);
+  }
 };
 
-// Function to scrape URL
 export async function scrapeUrl(url: string) {
   try {
     const response = await fetch(url);
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    // Remove unwanted elements
+    // remove unwanted elements
     $("script").remove();
     $("style").remove();
     $("comment").remove();
@@ -79,7 +153,7 @@ export async function scrapeUrl(url: string) {
     $('[class*="footer"]').remove();
     $('[id*="footer"]').remove();
 
-    // Get main content
+    // some common selectors for articles (may need to update this as needed)
     const contentSelectors = [
       "article",
       "main",
@@ -101,7 +175,7 @@ export async function scrapeUrl(url: string) {
       }
     }
 
-    // If no main content found, get body text
+    // if no main content found, get body text
     if (!mainContent) {
       mainContent = $("body").text();
     }
@@ -115,7 +189,6 @@ export async function scrapeUrl(url: string) {
   }
 }
 
-// Function to parse PDF
 export async function parsePdf(file: Buffer) {
   try {
     const data = await pdfParse(file, {
@@ -126,7 +199,7 @@ export async function parsePdf(file: Buffer) {
           return text;
         });
       },
-      max: 0, // No limit on pages
+      max: 0,
     });
 
     const cleanedText = cleanText(data.text);
@@ -153,28 +226,26 @@ export async function handleSubmission(formData: FormData) {
     if (!user) throw new Error("Not authenticated");
 
     // Create submission record
-    // const { data: submission, error: submissionError } = await supabase
-    //   .from("submissions")
-    //   .insert({
-    //     user_id: user.id,
-    //     url: url || null,
-    //     cadence,
-    //     repeatable: repeat === "repeat-forever",
-    //   })
-    //   .select()
-    //   .single();
+    const { data: submission, error: submissionError } = await supabase
+      .from("submissions")
+      .insert({
+        user_id: user.id,
+        url: url || null,
+        cadence,
+        repeatable: repeat === "repeat-forever",
+      })
+      .select()
+      .single();
 
-    // if (submissionError) throw submissionError;
+    if (submissionError) throw submissionError;
 
     let allChunks: string[] = [];
 
-    // Process URL if provided
     if (url?.trim()) {
       const urlChunks = await scrapeUrl(url);
       allChunks = [...allChunks, ...urlChunks];
     }
 
-    // Process PDF files if provided
     if (files.length > 0) {
       for (const file of files) {
         const buffer = Buffer.from(await file.arrayBuffer());
@@ -183,15 +254,14 @@ export async function handleSubmission(formData: FormData) {
       }
     }
 
-    // Insert all chunks into database
     if (allChunks.length > 0) {
-      //   const { error: cadenceError } = await supabase.from("cadences").insert(
-      //     allChunks.map((chunk) => ({
-      //       submission_id: submission.submission_id,
-      //       message_text: chunk,
-      //     }))
-      //   );
-      //   if (cadenceError) throw cadenceError;
+      const { error: cadenceError } = await supabase.from("cadences").insert(
+        allChunks.map((chunk) => ({
+          submission_id: submission.submission_id,
+          message_text: chunk,
+        }))
+      );
+      if (cadenceError) throw cadenceError;
     }
     // console.log("chunks: ", allChunks);
 
