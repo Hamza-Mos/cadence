@@ -230,6 +230,7 @@ export async function handleSubmission(formData: FormData) {
     if (!user) throw new Error("Not authenticated");
 
     let bucket_id = null;
+    let allChunks: string[] = [];
 
     // Upload PDF if provided
     if (files.length > 0) {
@@ -237,16 +238,34 @@ export async function handleSubmission(formData: FormData) {
       const timestamp = new Date().toISOString();
       const folderPath = `${user.id}/${timestamp}`;
 
-      // Upload each file
+      // Upload each file and get signed URLs
       for (const file of files) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const filePath = `${folderPath}/${file.name}`;
 
-        const { error: uploadError } = await supabase.storage
+        // Upload the file
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from("pdfs")
-          .upload(filePath, buffer);
+          .upload(filePath, buffer, {
+            contentType: file.type,
+            cacheControl: "3600",
+          });
 
         if (uploadError) throw uploadError;
+
+        // Get a signed URL for the uploaded file
+        const { data: signedUrlData, error: signedUrlError } =
+          await supabase.storage
+            .from("pdfs")
+            .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
+
+        if (signedUrlError || !signedUrlData?.signedUrl) throw signedUrlError;
+
+        // Use the signed URL to access the file
+        const fileResponse = await fetch(signedUrlData.signedUrl);
+        const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+        const pdfChunks = await parsePdf(fileBuffer);
+        allChunks = [...allChunks, ...pdfChunks];
       }
 
       bucket_id = folderPath;
@@ -267,21 +286,10 @@ export async function handleSubmission(formData: FormData) {
 
     if (submissionError) throw submissionError;
 
-    let allChunks: string[] = [];
-
     // Process URL if provided
     if (url?.trim()) {
       const urlChunks = await scrapeUrl(url);
       allChunks = [...allChunks, ...urlChunks];
-    }
-
-    // Process PDF files if provided
-    if (files.length > 0) {
-      for (const file of files) {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const pdfChunks = await parsePdf(buffer);
-        allChunks = [...allChunks, ...pdfChunks];
-      }
     }
 
     // Insert all chunks into database
