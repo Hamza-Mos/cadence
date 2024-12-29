@@ -33,7 +33,7 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
     3. Write in a casual, text-message friendly style while keeping the information accurate
     4. Ensure each chunk is self-contained and easily understood
     5. Use simple language and explanatory analogies where helpful
-    6. Keep each chunk under 500 characters
+    6. Keep each chunk under 1000 characters
     7. Remove any unnecessary information or redundant content
     8. Make the information memorable and easy to understand
     9. If the text is instructional, break it into clear, actionable steps
@@ -45,8 +45,8 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
   "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves. Pretty neat how nature figured that out! 🌞" ||| "💧 Water plays a huge role too! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food! It's like they're running their own tiny food factory 🏭"`;
 
   try {
-    // split text into smaller segments if it's too long
-    const maxCharsPerRequest = 4000; // safe limit for context window
+    // Split text into smaller segments if it's too long
+    const maxCharsPerRequest = 4000; // Safe limit for context window
     const textSegments = [];
     for (let i = 0; i < text.length; i += maxCharsPerRequest) {
       textSegments.push(text.slice(i, i + maxCharsPerRequest));
@@ -54,10 +54,10 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
 
     let allChunks: string[] = [];
 
-    // process each segment
+    // Process each segment
     for (const segment of textSegments) {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4-1106-preview", // need to experiment with different models
+        model: "gpt-4-1106-preview",
         messages: [
           {
             role: "system",
@@ -68,7 +68,7 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
             content: `Please break this text into engaging, informative chunks that feel like text messages: ${segment}`,
           },
         ],
-        temperature: 0.7, // balanced between creativity and consistency
+        temperature: 0.7,
         max_tokens: 2000,
       });
 
@@ -79,7 +79,7 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
         continue;
       }
 
-      // split response into chunks and add to collection
+      // Split response into chunks and add to collection
       const newChunks = response
         .split("|||")
         .map((chunk) => chunk.trim())
@@ -89,16 +89,16 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
 
     // Validate chunks
     allChunks = allChunks.filter((chunk) => {
-      // ensure each chunk is within size limits and has actual content
+      // Ensure each chunk is within size limits and has actual content
       return (
         chunk.length > 0 &&
-        chunk.length <= 500 &&
+        chunk.length <= 1000 && // Match database constraint
         chunk.split(/[.!?]+/).length >= 2
-      ); // at least 2 sentences
+      ); // At least 2 sentences
     });
 
     if (allChunks.length === 0) {
-      // fallback to simple chunking if GPT fails
+      // Fallback to simple chunking if GPT fails
       console.warn("GPT chunking failed, falling back to simple chunking");
       return text
         .split(/[.!?]+/)
@@ -110,12 +110,12 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
         .filter((chunk) => chunk.trim().length > 0);
     }
 
-    console.log("all chunks: ", allChunks);
+    console.log("All chunks:", allChunks);
 
     return allChunks;
   } catch (error) {
     console.error("Error in GPT text chunking:", error);
-    // fallback to simple chunking
+    // Fallback to simple chunking
     return text
       .split(/[.!?]+/)
       .reduce((acc: string[], sentence: string, i: number) => {
@@ -133,7 +133,7 @@ export async function scrapeUrl(url: string) {
     const html = await response.text();
     const $ = cheerio.load(html);
 
-    // remove unwanted elements
+    // Remove unwanted elements
     $("script").remove();
     $("style").remove();
     $("comment").remove();
@@ -153,7 +153,7 @@ export async function scrapeUrl(url: string) {
     $('[class*="footer"]').remove();
     $('[id*="footer"]').remove();
 
-    // some common selectors for articles (may need to update this as needed)
+    // Some common selectors for articles
     const contentSelectors = [
       "article",
       "main",
@@ -175,13 +175,13 @@ export async function scrapeUrl(url: string) {
       }
     }
 
-    // if no main content found, get body text
+    // If no main content found, get body text
     if (!mainContent) {
       mainContent = $("body").text();
     }
 
     const cleanedText = cleanText(mainContent);
-    console.log("cleaned text: ", cleanedText);
+    console.log("Cleaned text:", cleanedText);
     return splitIntoChunks(cleanedText);
   } catch (error) {
     console.error("Error scraping URL:", error);
@@ -192,18 +192,12 @@ export async function scrapeUrl(url: string) {
 export async function parsePdf(file: Buffer) {
   try {
     const data = await pdfParse(file, {
-      pagerender: function (pageData) {
-        return pageData.getTextContent().then((content: { items: any[] }) => {
-          const text = content.items.map((item) => item.str).join(" ");
-          console.log("Text content for a page:", text);
-          return text;
-        });
-      },
-      max: 0,
+      // Remove custom pagerender function to use default text extraction
+      max: 0, // No limit on pages
     });
 
     const cleanedText = cleanText(data.text);
-    console.log("cleaned text: ", cleanedText);
+    console.log("Cleaned text:", cleanedText);
     return splitIntoChunks(cleanedText);
   } catch (error) {
     console.error("Error parsing PDF:", error);
@@ -211,7 +205,17 @@ export async function parsePdf(file: Buffer) {
   }
 }
 
-// Main submission handler
+export async function getUser() {
+  try {
+    const supabase = await createClient();
+    const user = await supabase.auth.getUser();
+    return user.data.user;
+  } catch (error) {
+    console.error("Error getting user:", error);
+    throw new Error("Failed to get user details");
+  }
+}
+
 export async function handleSubmission(formData: FormData) {
   const supabase = await createClient();
   const url = formData.get("text") as string | null;
@@ -225,12 +229,36 @@ export async function handleSubmission(formData: FormData) {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
+    let bucket_id = null;
+
+    // Upload PDF if provided
+    if (files.length > 0) {
+      // Create a folder path with timestamp to ensure uniqueness
+      const timestamp = new Date().toISOString();
+      const folderPath = `${user.id}/${timestamp}`;
+
+      // Upload each file
+      for (const file of files) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const filePath = `${folderPath}/${file.name}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from("pdfs")
+          .upload(filePath, buffer);
+
+        if (uploadError) throw uploadError;
+      }
+
+      bucket_id = folderPath;
+    }
+
     // Create submission record
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .insert({
         user_id: user.id,
-        url: url || null,
+        url: url?.trim() || null,
+        bucket_id,
         cadence,
         repeatable: repeat === "repeat-forever",
       })
@@ -241,11 +269,13 @@ export async function handleSubmission(formData: FormData) {
 
     let allChunks: string[] = [];
 
+    // Process URL if provided
     if (url?.trim()) {
       const urlChunks = await scrapeUrl(url);
       allChunks = [...allChunks, ...urlChunks];
     }
 
+    // Process PDF files if provided
     if (files.length > 0) {
       for (const file of files) {
         const buffer = Buffer.from(await file.arrayBuffer());
@@ -254,6 +284,7 @@ export async function handleSubmission(formData: FormData) {
       }
     }
 
+    // Insert all chunks into database
     if (allChunks.length > 0) {
       const { error: cadenceError } = await supabase.from("cadences").insert(
         allChunks.map((chunk) => ({
@@ -263,11 +294,10 @@ export async function handleSubmission(formData: FormData) {
       );
       if (cadenceError) throw cadenceError;
     }
-    // console.log("chunks: ", allChunks);
 
     return {
       success: true,
-      submission_id: "submission_id",
+      submission_id: submission.submission_id,
       chunks_count: allChunks.length,
     };
   } catch (error) {
