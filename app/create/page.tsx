@@ -54,7 +54,7 @@ const FormSchema = z.object({
   repeat: z.string(),
 });
 
-export default function ProtectedPage() {
+export default function Create() {
   //   const supabase = await createClient();
 
   //   const {
@@ -82,11 +82,11 @@ export default function ProtectedPage() {
   }
 
   const hours = new Date().getHours();
-  let greeting = `Good morning, ${userName.split(" ")[0]}! ☀️`;
+  let greeting = `Create A Cadence ${userName.split(" ")[0]}! ☀️`;
   if (hours >= 12 && hours < 18) {
-    greeting = `Good afternoon, ${userName.split(" ")[0]}! 🌤️`;
+    greeting = `Create A Cadence, ${userName.split(" ")[0]}! 🌤️`;
   } else if (hours >= 18) {
-    greeting = `Good evening, ${userName.split(" ")[0]}! 🌙`;
+    greeting = `Create A Cadence, ${userName.split(" ")[0]}! 🌙`;
   }
 
   return (
@@ -149,14 +149,12 @@ export default function ProtectedPage() {
                 );
 
                 const onDelete = useCallback(
-                  (file: File) => {
+                  (file: string) => {
                     const currentItems = form.getValues("files");
                     if (currentItems) {
                       form.setValue(
                         "files",
-                        currentItems.filter(
-                          (item: File) => item.name !== file.name
-                        )
+                        currentItems.filter((item: File) => item.name !== file)
                       );
                     }
                   },
@@ -177,7 +175,8 @@ export default function ProtectedPage() {
                       {field.value?.map((file: File) => (
                         <FileTile
                           key={file.name}
-                          file={file}
+                          filename={file.name}
+                          filesize={file.size}
                           onDelete={onDelete}
                         />
                       ))}
