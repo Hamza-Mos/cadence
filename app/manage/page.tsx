@@ -32,7 +32,7 @@ export default async function Manage() {
                 uploadedFiles={submission.uploaded_files}
                 cadence={submission.cadence}
                 repeat={submission.repeat}
-                created={new Date()}
+                created={submission.created_at}
               />
             ))}
           </div>

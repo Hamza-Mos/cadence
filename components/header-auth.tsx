@@ -65,11 +65,12 @@ export default async function AuthButton() {
   return user ? (
     <div className="flex items-center gap-4">
       Hey, {data[0].first_name}!
-      {!data[0].is_subscribed && (
-        <Button type="submit" variant={"default"}>
-          Pro ✨
-        </Button>
-      )}
+      <Link
+        className="py-2 px-4 border border-yellow-500 rounded-md"
+        href={!data[0].is_subscribed ? "/api/checkout" : "/api/billing"}
+      >
+        {!data[0].is_subscribed ? "Get" : "Manage"}&nbsp;Pro ✨
+      </Link>
       <form action={signOutAction}>
         <Button type="submit" variant={"outline"}>
           Sign out

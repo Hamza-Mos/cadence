@@ -167,7 +167,6 @@ export default function UploadForm({
           texts at an interval of your choice.
         </p>
       </div>
-      {error && <div className="w-full text-center text-red-500">{error}</div>}
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
@@ -337,6 +336,9 @@ export default function UploadForm({
               {isSubmitting ? "Submitting..." : "Submit"}
             </Button>
           </div>
+          {error && (
+            <div className="w-full text-center text-red-500">{error}</div>
+          )}
         </form>
       </Form>
     </div>

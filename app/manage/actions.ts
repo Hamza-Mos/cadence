@@ -9,7 +9,7 @@ interface Submission {
   uploaded_files: string[];
   cadence: string;
   repeat: string;
-  created_at: string;
+  created_at: Date;
 }
 
 export async function handleGetSubmissions() {
@@ -35,7 +35,7 @@ export async function handleGetSubmissions() {
       uploaded_files: submission.uploaded_files,
       cadence: submission.cadence,
       repeat: submission.repeat,
-      created_at: new Date(submission.created_at).toLocaleString(),
+      created_at: new Date(submission.created_at),
     } as Submission;
   });
 

@@ -279,10 +279,10 @@ export async function handleSubmission(formData: FormData) {
     // Check if user can submit
     const canSubmit = await checkUserCanSubmit(supabase, user.id);
 
-    console.log("Can submit:", canSubmit);
-
     if (!canSubmit) {
-      throw new Error("Submission limit reached. Subscribe to Pro ✨");
+      throw new Error(
+        `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨`
+      );
     }
 
     // Generate a submission ID

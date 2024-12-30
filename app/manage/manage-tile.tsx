@@ -32,10 +32,14 @@ function formatDate(date: Date): string {
   let day = date.getDate().toString().padStart(2, "0");
 
   // Construct the time part
-  let time = "5:30 PM";
+  let hours = date.getHours().toString().padStart(2, "0");
+  let minutes = date.getMinutes().toString().padStart(2, "0");
+  let ampm = hours >= "12" ? "PM" : "AM";
+  hours = (parseInt(hours) % 12).toString().padStart(2, "0");
+  let time = `${hours}:${minutes} ${ampm}`;
 
   // Combine the parts into the desired format
-  return `${year}/${month}/${day} at ${time}`;
+  return `${month}/${day}/${year} at ${time}`;
 }
 
 export default function ManageTile({
@@ -46,10 +50,6 @@ export default function ManageTile({
   repeat,
   created,
 }: ManageTileProps) {
-  const deleteCadence = (uuid: string) => {
-    console.log(`Deleting cadence with uuid: ${uuid}`);
-  };
-
   return (
     <Card className="w-[520px]">
       <CardHeader>
