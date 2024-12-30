@@ -1,30 +1,25 @@
+"use client";
+
 import * as React from "react";
 
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { FileMeta } from "@/lib/utils";
+import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import FileTile from "@/components/filetile";
+import { handleDeleteSubmission } from "./actions";
 
-interface TileProps {
+interface ManageTileProps {
   uuid: string;
-  text: string;
-  files: FileMeta[];
+  textField: string;
+  uploadedFiles: string[];
   cadence: string;
   repeat: string;
   created: Date;
@@ -43,14 +38,14 @@ function formatDate(date: Date): string {
   return `${year}/${month}/${day} at ${time}`;
 }
 
-export function ManageTile({
+export default function ManageTile({
   uuid,
-  text,
-  files,
+  textField,
+  uploadedFiles,
   cadence,
   repeat,
   created,
-}: TileProps) {
+}: ManageTileProps) {
   const deleteCadence = (uuid: string) => {
     console.log(`Deleting cadence with uuid: ${uuid}`);
   };
@@ -65,12 +60,12 @@ export function ManageTile({
           <div className="grid w-full items-center gap-4">
             <div className="flex flex-col space-y-1.5">
               <Label htmlFor="name">Content</Label>
-              <Input id="name" placeholder={text} readOnly />
-              {files.map((file) => (
-                <div key={file.name}>
+              <Input id="name" placeholder={textField} readOnly />
+              {uploadedFiles.map((file) => (
+                <div key={file}>
                   <FileTile
-                    filename={file.name}
-                    filesize={file.size}
+                    filename={file}
+                    filesize={undefined}
                     onDelete={undefined}
                   />
                 </div>
@@ -88,7 +83,7 @@ export function ManageTile({
               <Label htmlFor="framework">Repeat</Label>
               <Select>
                 <SelectTrigger id="framework">
-                  <SelectValue placeholder={cadence} />
+                  <SelectValue placeholder={repeat} />
                 </SelectTrigger>
               </Select>
             </div>
@@ -100,7 +95,7 @@ export function ManageTile({
           variant="outline"
           className="border-red-500 text-red-500"
           onClick={() => {
-            deleteCadence(uuid);
+            handleDeleteSubmission(uuid);
           }}
         >
           Delete

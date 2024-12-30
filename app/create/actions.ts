@@ -4,6 +4,7 @@ import * as cheerio from "cheerio";
 import pdfParse from "pdf-parse";
 import { createClient } from "@/utils/supabase/server";
 import OpenAI from "openai";
+import { randomUUID } from "crypto";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
@@ -30,19 +31,19 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
   const systemPrompt = `You are an expert at breaking down complex information into simple, engaging text messages. Your task is to:
     1. Break down the given text into bite-sized chunks of 3-5 sentences each
     2. Make each chunk focus on a single concept, topic, idea, or quote.
-    3. Write in a casual, text-message friendly style while keeping the information accurate.
+    3. Write in a text-message friendly style while keeping the information accurate.
     4. Ensure each chunk is self-contained and easily understood,
-    5. Use simple language and explanatory analogies where helpful
-    6. Keep each chunk under 1000 characters
+    5. Use simple language and explanatory analogies where helpful.
+    6. Keep each chunk under 1000 characters.
     7. Remove any unnecessary information or redundant content - this includes information about the author, any small talk, introductory content etc. that doesn't have meaningful informational value.
     8. Make the information memorable and easy to understand.
     9. If the text is instructional, break it into clear, actionable steps.
-    10. Maintain a friendly, conversational tone.
+    10. Ignore any content related to appendix or index. Only generate messages on the main content of the material.
   
   Output format should be a series of chunks separated by "|||". Each chunk should be a self-contained message. Do not include a message that introduces the topic, remember each message should have some informational value.
   
   For example, if given a technical article about photosynthesis, good chunks would be:
-  "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves. Pretty neat how nature figured that out! 🌞" ||| "💧 Water plays a huge role too! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food! It's like they're running their own tiny food factory 🏭"`;
+  "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves." ||| "💧 Water plays a huge role in photosynthesis! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food!"`;
 
   try {
     // Split text into smaller segments if it's too long
@@ -57,7 +58,7 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
     // Process each segment
     for (const segment of textSegments) {
       const completion = await openai.chat.completions.create({
-        model: "gpt-4-1106-preview",
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -218,10 +219,14 @@ export async function getUser() {
 
 export async function handleSubmission(formData: FormData) {
   const supabase = await createClient();
-  const url = formData.get("text") as string | null;
+  const url = formData.get("url") as string | null;
+  const raw_text = formData.get("raw_text") as string | null;
   const files = formData.getAll("files") as File[];
   const cadence = formData.get("cadence") as string;
   const repeat = formData.get("repeat") as string;
+
+  console.log("URL:", url);
+  console.log("Raw text:", raw_text);
 
   try {
     const {
@@ -232,11 +237,12 @@ export async function handleSubmission(formData: FormData) {
     let bucket_id = null;
     let allChunks: string[] = [];
 
+    // Generate a submission ID
+    const submission_id = randomUUID();
+
     // Upload PDF if provided
     if (files.length > 0) {
-      // Create a folder path with timestamp to ensure uniqueness
-      const timestamp = new Date().toISOString();
-      const folderPath = `${user.id}/${timestamp}`;
+      const folderPath = `${user.id}/${submission_id}`;
 
       // Upload each file and get signed URLs
       for (const file of files) {
@@ -256,7 +262,7 @@ export async function handleSubmission(formData: FormData) {
         // Get a signed URL for the uploaded file
         const { data: signedUrlData, error: signedUrlError } =
           await supabase.storage
-            .from("pdfs")
+            .from("attachments")
             .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
 
         if (signedUrlError || !signedUrlData?.signedUrl) throw signedUrlError;
@@ -275,11 +281,12 @@ export async function handleSubmission(formData: FormData) {
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .insert({
+        submission_id: submission_id,
         user_id: user.id,
-        url: url?.trim() || null,
-        bucket_id,
+        text_field: url?.trim() || raw_text || null,
+        uploaded_files: files.map((file) => file.name),
         cadence,
-        repeatable: repeat === "repeat-forever",
+        repeat,
       })
       .select()
       .single();
@@ -290,6 +297,11 @@ export async function handleSubmission(formData: FormData) {
     if (url?.trim()) {
       const urlChunks = await scrapeUrl(url);
       allChunks = [...allChunks, ...urlChunks];
+    }
+
+    if (raw_text) {
+      const textChunks = await splitIntoChunks(cleanText(raw_text));
+      allChunks = [...allChunks, ...textChunks];
     }
 
     // Insert all chunks into database

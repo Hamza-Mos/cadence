@@ -2,7 +2,7 @@ import { DocumentIcon, XMarkIcon } from "@heroicons/react/24/solid";
 
 interface FileTileProps {
   filename: string;
-  filesize: number;
+  filesize?: number;
   onDelete?: (file: string) => void;
 }
 
@@ -21,7 +21,7 @@ export default function FileTile({
           <p className="text-sm">{filename}</p>
         </div>
         <span className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded-full">
-          {Math.round((filesize / (1024 * 1024)) * 100) / 100} MB
+          {filesize && Math.round((filesize / (1024 * 1024)) * 100) / 100} MB
         </span>
       </div>
       <div className="flex items-center space-x-2">

@@ -82,6 +82,15 @@ const FormSchema = z
     }
   );
 
+function isValidURL(url: string) {
+  try {
+    new URL(url);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 interface UploadFormProps {
   initialUserName: string;
 }
@@ -108,7 +117,11 @@ export default function UploadForm({ initialUserName }: UploadFormProps) {
       const formData = new FormData();
       const textContent = data.text?.trim() || "";
       if (textContent) {
-        formData.append("text", textContent);
+        if (isValidURL(textContent)) {
+          formData.append("url", textContent);
+        } else {
+          formData.append("raw_text", textContent);
+        }
       }
 
       for (const file of data.files) {
