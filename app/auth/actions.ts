@@ -4,6 +4,7 @@ import { encodedRedirect } from "@/utils/utils";
 import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Stripe from "stripe";
 
 export async function signUpWithPhone(formData: FormData) {
   const supabase = await createClient();
@@ -28,6 +29,27 @@ export async function signUpWithPhone(formData: FormData) {
       };
     }
 
+    // then create stripe id for the user
+
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
+
+    if (!stripe) {
+      return {
+        error: "Failed to init Stripe client.",
+      };
+    }
+
+    const customer = await stripe.customers.create({
+      name: `${firstName} ${lastName}`,
+      phone: `${areaCode} ${fullPhone}`,
+    });
+
+    if (!customer) {
+      return {
+        error: "Failed to create customer because of issues with Stripe.",
+      };
+    }
+
     const { data, error } = await supabase.auth.signInWithOtp({
       phone: fullPhone,
       options: {
@@ -36,6 +58,7 @@ export async function signUpWithPhone(formData: FormData) {
           first_name: firstName,
           last_name: lastName,
           area_code: areaCode,
+          stripe_id: customer.id,
         },
       },
     });
@@ -52,7 +75,7 @@ export async function signUpWithPhone(formData: FormData) {
     };
   } catch (error) {
     return {
-      error: "Failed to send verification code",
+      error: `Failed to send verification code.`,
     };
   }
 }
@@ -150,6 +173,7 @@ export async function verifySignUpOtp(formData: FormData) {
       first_name: metadata.first_name,
       last_name: metadata.last_name,
       area_code: metadata.area_code,
+      stripe_id: metadata.stripe_id,
       phone: metadata.phone_number,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
