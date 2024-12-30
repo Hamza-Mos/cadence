@@ -14,11 +14,23 @@ export default async function CreatePage() {
     redirect("/sign-in");
   }
 
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", user?.id);
+
+  if (!data || data.length === 0 || error) {
+    throw new Error("Error getting user data");
+  }
+
   const userName = user.user_metadata.first_name;
 
   return (
     <Suspense fallback={<div>Loading...</div>}>
-      <UploadForm initialUserName={userName} />
+      <UploadForm
+        initialUserName={userName}
+        isSubscribed={data[0].is_subscribed}
+      />
     </Suspense>
   );
 }

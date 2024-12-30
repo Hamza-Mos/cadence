@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/server";
+import { redirect } from "next/navigation";
 
 export default async function AuthButton() {
   const supabase = await createClient();
@@ -11,6 +12,19 @@ export default async function AuthButton() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect("/sign-in");
+  }
+
+  const { data, error } = await supabase
+    .from("users")
+    .select("*")
+    .eq("id", user?.id);
+
+  if (!data || data.length === 0 || error) {
+    throw new Error("Error getting user data");
+  }
 
   if (!hasEnvVars) {
     return (
@@ -50,7 +64,12 @@ export default async function AuthButton() {
   }
   return user ? (
     <div className="flex items-center gap-4">
-      Hey, {user.user_metadata.first_name}!
+      Hey, {data[0].first_name}!
+      {!data[0].is_subscribed && (
+        <Button type="submit" variant={"default"}>
+          Pro ✨
+        </Button>
+      )}
       <form action={signOutAction}>
         <Button type="submit" variant={"outline"}>
           Sign out

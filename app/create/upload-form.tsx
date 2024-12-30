@@ -93,9 +93,13 @@ function isValidURL(url: string) {
 
 interface UploadFormProps {
   initialUserName: string;
+  isSubscribed: boolean;
 }
 
-export default function UploadForm({ initialUserName }: UploadFormProps) {
+export default function UploadForm({
+  initialUserName,
+  isSubscribed,
+}: UploadFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -279,9 +283,15 @@ export default function UploadForm({ initialUserName }: UploadFormProps) {
                       <SelectGroup>
                         <SelectLabel>Cadence</SelectLabel>
                         <SelectItem value="receive-daily">day</SelectItem>
-                        <SelectItem value="receive-12">12 hours</SelectItem>
-                        <SelectItem value="receive-6">6 hours</SelectItem>
-                        <SelectItem value="receive-1">1 hour</SelectItem>
+                        <SelectItem value="receive-12" disabled={!isSubscribed}>
+                          12 hours {!isSubscribed && "(Pro ✨)"}
+                        </SelectItem>
+                        <SelectItem value="receive-6" disabled={!isSubscribed}>
+                          6 hours {!isSubscribed && "(Pro ✨)"}
+                        </SelectItem>
+                        <SelectItem value="receive-1" disabled={!isSubscribed}>
+                          1 hour {!isSubscribed && "(Pro ✨)"}
+                        </SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
@@ -307,7 +317,12 @@ export default function UploadForm({ initialUserName }: UploadFormProps) {
                     <SelectContent>
                       <SelectGroup>
                         <SelectLabel>Repeat</SelectLabel>
-                        <SelectItem value="repeat-forever">forever</SelectItem>
+                        <SelectItem
+                          value="repeat-forever"
+                          disabled={!isSubscribed}
+                        >
+                          forever {!isSubscribed && "(Pro ✨)"}
+                        </SelectItem>
                         <SelectItem value="do-not-repeat">never</SelectItem>
                       </SelectGroup>
                     </SelectContent>
