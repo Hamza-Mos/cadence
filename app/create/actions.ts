@@ -5,10 +5,13 @@ import pdfParse from "pdf-parse";
 import { createClient } from "@/utils/supabase/server";
 import OpenAI from "openai";
 import { randomUUID } from "crypto";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+const MAX_FREE_SUBMISSIONS = 7;
 
 const cleanText = (text: string): string => {
   return text
@@ -190,6 +193,43 @@ export async function scrapeUrl(url: string) {
   }
 }
 
+async function checkUserCanSubmit(
+  supabase: SupabaseClient<any, "public", any>,
+  user_id: string
+) {
+  // validate if the user is allowed to submit
+  const { data: user_data, error: userError } = await supabase
+    .from("users")
+    .select("is_subscribed")
+    .eq("id", user_id)
+    .single();
+
+  if (userError) throw userError;
+
+  // get number of submissions from user
+  const { data: submissions, error: submissionError } = await supabase
+    .from("submissions")
+    .select("*")
+    .eq("user_id", user_id);
+
+  if (submissionError) throw submissionError;
+
+  console.log(
+    submissions.length >= MAX_FREE_SUBMISSIONS,
+    user_data.is_subscribed
+  );
+
+  if (
+    user_data.is_subscribed === false &&
+    submissions.length >= MAX_FREE_SUBMISSIONS
+  ) {
+    console.log("User has reached submission limit");
+    return false;
+  }
+
+  return true;
+}
+
 export async function parsePdf(file: Buffer) {
   try {
     const data = await pdfParse(file, {
@@ -234,8 +274,16 @@ export async function handleSubmission(formData: FormData) {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
-    let bucket_id = null;
     let allChunks: string[] = [];
+
+    // Check if user can submit
+    const canSubmit = await checkUserCanSubmit(supabase, user.id);
+
+    console.log("Can submit:", canSubmit);
+
+    if (!canSubmit) {
+      throw new Error("Submission limit reached. Subscribe to Pro ✨");
+    }
 
     // Generate a submission ID
     const submission_id = randomUUID();
@@ -273,8 +321,6 @@ export async function handleSubmission(formData: FormData) {
         const pdfChunks = await parsePdf(fileBuffer);
         allChunks = [...allChunks, ...pdfChunks];
       }
-
-      bucket_id = folderPath;
     }
 
     // Create submission record
