@@ -10,8 +10,8 @@ export default function DropZoneUI({
           {isDragActive ? "🫳🏾 Drop file" : "📁 Upload Any files"}
         </p>
         <br />
-        <p className="flex flex-row justify-around text-sm">
-          Click&nbsp;<u>here</u>&nbsp;or drag files here. Maximum file size 5MB.
+        <p className="flex flex-row text-sm px-4">
+          Click&nbsp;<u>here</u>&nbsp;or drag files. Max file size 5MB.
         </p>
       </div>
     </div>

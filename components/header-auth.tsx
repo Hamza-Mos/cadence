@@ -4,8 +4,8 @@ import Link from "next/link";
 import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/server";
-import { redirect } from "next/navigation";
 import { PostgrestSingleResponse } from "@supabase/supabase-js";
+import { PowerIcon } from "@heroicons/react/24/outline";
 
 export default async function AuthButton() {
   const supabase = await createClient();
@@ -67,16 +67,23 @@ export default async function AuthButton() {
   }
   return user ? (
     <div className="flex items-center gap-4">
-      Hey, {resp.data[0].first_name}!
+      <div className="hidden md:block">Hey, {resp.data[0].first_name}!</div>
       <Link
         className="py-2 px-4 border border-yellow-500 rounded-md"
         href={!resp.data[0].is_subscribed ? "/api/checkout" : "/api/billing"}
       >
-        {!resp.data[0].is_subscribed ? "Get" : "Manage"}&nbsp;Pro ✨
+        <div className="flex flex-row">
+          <div className="flex flex-row hidden md:block">
+            {!resp.data[0].is_subscribed ? "Get Pro" : "Manage Pro"}&nbsp;
+          </div>
+          ✨
+        </div>
       </Link>
       <form action={signOutAction}>
         <Button type="submit" variant={"outline"}>
-          Sign out
+          <PowerIcon className="w-4 h-4" />
+
+          <div className="hidden md:block">&nbsp;{"Sign out"}</div>
         </Button>
       </form>
     </div>

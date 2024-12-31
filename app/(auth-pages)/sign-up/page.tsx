@@ -41,7 +41,7 @@ export default function SignUp() {
     if ("error" in result) {
       setMessage({ error: result.error });
     } else {
-      router.push("/protected");
+      router.push("/create");
     }
   };
 

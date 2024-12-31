@@ -51,7 +51,7 @@ export default function ManageTile({
   created,
 }: ManageTileProps) {
   return (
-    <Card className="w-[520px]">
+    <Card className="max-w-[520px]">
       <CardHeader>
         <CardTitle>{`Created on ${formatDate(created)}`}</CardTitle>
       </CardHeader>

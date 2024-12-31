@@ -3,7 +3,7 @@ import Link from "next/link";
 export default function Hero() {
   return (
     <div className="flex flex-col gap-8 items-center">
-      <p className="text-5xl !leading-tight mx-auto max-w-2xl text-center font-bold text-4xl">
+      <p className="text-5xl !leading-tight mx-auto max-w-2xl text-center font-bold text-3xl md:text-4xl">
         Microlearning made easy ⚡️
       </p>
       <p className="text-md mx-auto text-center">
@@ -18,13 +18,13 @@ export default function Hero() {
       </Link>
       <br />
       <div className="flex flex-col gap-2">
-        <div className="text-3xl font-bold text-center p-2">
+        <div className="text-2xl md:text-3xl font-bold text-center p-2">
           How Cadence Works?
         </div>
-        <p className="w-full flex flex-row justify-start text-lg mx-auto max-w-md font-bold">
+        <p className="w-full flex flex-row justify-start text-md md:text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 1
         </p>
-        <p className="text-md mx-auto max-w-md">
+        <p className="text-sm md:text-md mx-auto max-w-md">
           Share what you want to learn! Upload PDFs, text, images, or URLs
           (video support coming soon).
         </p>
@@ -33,7 +33,7 @@ export default function Hero() {
         <p className="w-full flex flex-row justify-start text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 2
         </p>
-        <p className="text-md mx-auto max-w-md">
+        <p className="text-sm md:text-md mx-auto max-w-md">
           Choose how often you’d like to receive text messages and decide if
           you'd like the information to repeat for better retention.
         </p>
@@ -42,7 +42,7 @@ export default function Hero() {
         <p className="w-full flex flex-row justify-start text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 3
         </p>
-        <p className="text-md mx-auto max-w-md">
+        <p className="text-sm md:text-md  mx-auto max-w-md">
           Hit submit, and we’ll transform your content into bite-sized,
           digestible text messages tailored to your schedule.
         </p>
@@ -51,20 +51,24 @@ export default function Hero() {
         <p className="w-full flex flex-row justify-start text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 4
         </p>
-        <p className="text-md mx-auto max-w-md">
+        <p className="text-sm md:text-md mx-auto max-w-md">
           Stay informed and retain knowledge with easy-to-read, perfectly timed
           messages sent straight to your phone.
         </p>
       </div>
       <br />
       <div className="flex flex-col gap-2">
-        <div className="text-3xl font-bold text-center p-2">Pricing</div>
+        <div className="text-2xl md:text-3xl font-bold text-center p-2">
+          Pricing
+        </div>
         <section className="py-8 sm:py-16">
           <div className="container mx-auto px-6 text-center">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
               {/* Free Plan */}
               <div className="shadow-lg rounded-lg p-6 border-2 border-gray-500">
-                <h3 className="text-3xl font-semibold mb-4">Free</h3>
+                <h3 className="text-2xl md:text-3xl font-semibold mb-4">
+                  Free
+                </h3>
                 <p className="text-gray-500 mb-6">
                   Try Cadence to help you microlearn.
                 </p>
@@ -80,7 +84,9 @@ export default function Hero() {
 
               {/* Pro Plan */}
               <div className="shadow-lg rounded-lg p-6 border-2 border-yellow-500">
-                <h3 className="text-3xl font-semibold mb-4">Pro ✨</h3>
+                <h3 className="text-2xl md:text-3xl font-semibold mb-4">
+                  Pro ✨
+                </h3>
                 <p className="text-gray-500 mb-6">Never forget a thing!</p>
                 <p className="text-4xl font-bold mb-6">
                   $4.99<span className="text-lg">/month</span>

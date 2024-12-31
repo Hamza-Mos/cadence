@@ -132,7 +132,7 @@ export async function verifyPhoneOtp(formData: FormData) {
     };
   }
 
-  return redirect("/protected");
+  return redirect("/create");
 }
 
 // New action for sign up verification
@@ -192,7 +192,7 @@ export async function verifySignUpOtp(formData: FormData) {
     };
   }
 
-  return redirect("/protected");
+  return redirect("/create");
 }
 
 export const completeSignup = async (formData: FormData) => {
@@ -339,7 +339,7 @@ export const signInAction = async (formData: FormData) => {
     return encodedRedirect("error", "/sign-in", error.message);
   }
 
-  return redirect("/protected");
+  return redirect("/create");
 };
 
 export const forgotPasswordAction = async (formData: FormData) => {
