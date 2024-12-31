@@ -8,7 +8,6 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import Link from "next/link";
 import { SubmitButton } from "@/components/submit-button";
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 
 export default function Login() {
   const [step, setStep] = useState<"phone" | "verification">("phone");
@@ -16,7 +15,6 @@ export default function Login() {
   const [message, setMessage] = useState<{ success?: string; error?: string }>(
     {}
   );
-  const router = useRouter();
 
   const handleSendCode = async (formData: FormData) => {
     const result = await signInWithPhone(formData);

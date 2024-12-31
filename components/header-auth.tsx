@@ -5,6 +5,7 @@ import { Badge } from "./ui/badge";
 import { Button } from "./ui/button";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+import { PostgrestSingleResponse } from "@supabase/supabase-js";
 
 export default async function AuthButton() {
   const supabase = await createClient();
@@ -13,17 +14,19 @@ export default async function AuthButton() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) {
-    redirect("/sign-in");
-  }
+  let resp: PostgrestSingleResponse<any[]> = {
+    data: [],
+    error: null,
+    status: 200,
+    statusText: "",
+    count: 0,
+  };
 
-  const { data, error } = await supabase
-    .from("users")
-    .select("*")
-    .eq("id", user?.id);
-
-  if (!data || data.length === 0 || error) {
-    throw new Error("Error getting user data");
+  if (user) {
+    resp = await supabase.from("users").select("*").eq("id", user?.id);
+    if (!resp.data || resp.data.length === 0 || resp.error) {
+      throw new Error("Error getting user data");
+    }
   }
 
   if (!hasEnvVars) {
@@ -64,12 +67,12 @@ export default async function AuthButton() {
   }
   return user ? (
     <div className="flex items-center gap-4">
-      Hey, {data[0].first_name}!
+      Hey, {resp.data[0].first_name}!
       <Link
         className="py-2 px-4 border border-yellow-500 rounded-md"
-        href={!data[0].is_subscribed ? "/api/checkout" : "/api/billing"}
+        href={!resp.data[0].is_subscribed ? "/api/checkout" : "/api/billing"}
       >
-        {!data[0].is_subscribed ? "Get" : "Manage"}&nbsp;Pro ✨
+        {!resp.data[0].is_subscribed ? "Get" : "Manage"}&nbsp;Pro ✨
       </Link>
       <form action={signOutAction}>
         <Button type="submit" variant={"outline"}>
