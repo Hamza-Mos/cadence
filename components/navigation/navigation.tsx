@@ -1,10 +1,15 @@
 import NavLinks from "@/components/navigation/navlinks";
+import { createClient } from "@/utils/supabase/server";
 
-export default function Navigation() {
+export default async function Navigation() {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   return (
     <div className="flex flex-row">
       <div className="flex grow justify-between gap-6">
-        <NavLinks />
+        {user !== null ? <NavLinks /> : <></>}
       </div>
     </div>
   );
