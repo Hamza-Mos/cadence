@@ -39,7 +39,7 @@ export default function Login() {
   };
 
   return (
-    <div className="flex flex-col min-w-96 max-w-96 mx-auto py-32">
+    <div className="flex flex-col mx-auto py-32">
       <h1 className="text-2xl font-medium">Sign in</h1>
       <p className="text-sm text-foreground">
         Don't have an account?{" "}

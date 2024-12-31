@@ -3,14 +3,24 @@ import Link from "next/link";
 export default function Hero() {
   return (
     <div className="flex flex-col gap-8 items-center">
-      <p className="text-5xl !leading-tight mx-auto max-w-xl text-center font-bold text-4xl">
+      <p className="text-5xl !leading-tight mx-auto max-w-2xl text-center font-bold text-4xl">
         Microlearning made easy ⚡️
       </p>
       <p className="text-md mx-auto text-center">
         Trouble reading long form content? <br />
         No problem! Learn anything in 4 easy steps.
       </p>
+      <Link
+        href="/create"
+        className="opacity-100 bg-white rounded-md text-black py-2 px-4 text-center cursor-pointer hover:bg-black hover:text-white hover:border-white border-2"
+      >
+        Get Started
+      </Link>
+      <br />
       <div className="flex flex-col gap-2">
+        <div className="text-3xl font-bold text-center p-2">
+          How Cadence Works?
+        </div>
         <p className="w-full flex flex-row justify-start text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 1
         </p>
@@ -46,12 +56,50 @@ export default function Hero() {
           messages sent straight to your phone.
         </p>
       </div>
-      <Link
-        href="/create"
-        className="opacity-100 bg-white rounded-md text-black py-2 px-4 text-center cursor-pointer hover:bg-black hover:text-white hover:border-white border-2"
-      >
-        Get Started
-      </Link>
+      <br />
+      <div className="flex flex-col gap-2">
+        <div className="text-3xl font-bold text-center p-2">Pricing</div>
+        <section className="py-8 sm:py-16">
+          <div className="container mx-auto px-6 text-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Free Plan */}
+              <div className="shadow-lg rounded-lg p-6 border-2 border-gray-500">
+                <h3 className="text-3xl font-semibold mb-4">Free</h3>
+                <p className="text-gray-500 mb-6">
+                  Try Cadence to help you microlearn.
+                </p>
+                <p className="text-4xl font-bold mb-6">
+                  $0<span className="text-lg">/month</span>
+                </p>
+                <ul className="text-left mb-6">
+                  <li className="mb-2">✔ Up to 7 submissions</li>
+                  <li className="mb-2">✔ One text per day</li>
+                  <li className="mb-2">✔ Priority Support</li>
+                </ul>
+              </div>
+
+              {/* Pro Plan */}
+              <div className="shadow-lg rounded-lg p-6 border-2 border-yellow-500">
+                <h3 className="text-3xl font-semibold mb-4">Pro ✨</h3>
+                <p className="text-gray-500 mb-6">Never forget a thing!</p>
+                <p className="text-4xl font-bold mb-6">
+                  $4.99<span className="text-lg">/month</span>
+                </p>
+                <ul className="text-left mb-6">
+                  <li className="mb-2">✔ Unlimited submissions</li>
+                  <li className="mb-2">
+                    ✔ One text every day, 12 hours, 6 hours or 1 hour
+                  </li>
+                  <li className="mb-2">
+                    ✔ Repeat information over time for better retention
+                  </li>
+                  <li className="mb-2">✔ Priority Support</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

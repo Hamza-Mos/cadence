@@ -33,7 +33,7 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <main className="min-h-screen flex flex-col items-center">
-            <div className="flex-1 w-full flex flex-col xl:gap-20 gap-8 items-center">
+            <div className="w-full h-full flex flex-col flex-grow justify-between xl:gap-20 gap-8 items-center">
               <nav className="w-full flex justify-between border-b border-b-foreground/10 h-16">
                 <div className="w-full flex justify-between items-center p-3 px-5 text-sm">
                   <div className="flex gap-10 items-center font-semibold">
@@ -44,7 +44,7 @@ export default function RootLayout({
                 </div>
               </nav>
               <div className="flex flex-row justify-between w-full h-full">
-                <div className="w-full flex flex-row justify-around gap-20 p-5">
+                <div className="w-full flex flex-row justify-around gap-20 p-7 sm:p-5">
                   {children}
                 </div>
               </div>

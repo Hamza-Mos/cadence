@@ -46,7 +46,7 @@ export default function SignUp() {
   };
 
   return (
-    <div className="flex flex-col min-w-96 max-w-96 mx-auto">
+    <div className="flex flex-col py-16 mx-auto">
       <h1 className="text-2xl font-medium">Sign up</h1>
       <p className="text-sm text text-foreground">
         Already have an account?{" "}
