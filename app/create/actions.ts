@@ -32,7 +32,7 @@ const cleanText = (text: string): string => {
 
 const splitIntoChunks = async (text: string): Promise<string[]> => {
   const systemPrompt = `You are an expert at breaking down complex information into simple, engaging text messages. Your task is to:
-    1. Break down the given text into bite-sized chunks of 3-5 sentences each
+    1. Break down the given text into bite-sized chunks of 4-5 sentences each
     2. Make each chunk focus on a single concept, topic, idea, or quote.
     3. Write in a text-message friendly style while keeping the information accurate.
     4. Ensure each chunk is self-contained and easily understood,
@@ -97,7 +97,8 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
       return (
         chunk.length > 0 &&
         chunk.length <= 1000 && // Match database constraint
-        chunk.split(/[.!?]+/).length >= 2
+        chunk.split(/[.!?]+/).length >= 2 &&
+        chunk.slice(0, 10).toLowerCase().includes("i'm sorry")
       ); // At least 2 sentences
     });
 
@@ -152,8 +153,6 @@ export async function scrapeUrl(url: string) {
     $('[id*="advertisement"]').remove();
     $('[class*="sidebar"]').remove();
     $('[id*="sidebar"]').remove();
-    $('[class*="menu"]').remove();
-    $('[id*="menu"]').remove();
     $('[class*="footer"]').remove();
     $('[id*="footer"]').remove();
 
@@ -169,6 +168,7 @@ export async function scrapeUrl(url: string) {
       ".content",
       '[role="main"]',
       "#content",
+      "#mw-content-text",
     ];
 
     let mainContent = "";
@@ -185,7 +185,6 @@ export async function scrapeUrl(url: string) {
     }
 
     const cleanedText = cleanText(mainContent);
-    console.log("Cleaned text:", cleanedText);
     return splitIntoChunks(cleanedText);
   } catch (error) {
     console.error("Error scraping URL:", error);
@@ -213,11 +212,6 @@ async function checkUserCanSubmit(
     .eq("user_id", user_id);
 
   if (submissionError) throw submissionError;
-
-  console.log(
-    submissions.length >= MAX_FREE_SUBMISSIONS,
-    user_data.is_subscribed
-  );
 
   if (
     user_data.is_subscribed === false &&
@@ -265,9 +259,6 @@ export async function handleSubmission(formData: FormData) {
   const cadence = formData.get("cadence") as string;
   const repeat = formData.get("repeat") as string;
 
-  console.log("URL:", url);
-  console.log("Raw text:", raw_text);
-
   try {
     const {
       data: { user },
@@ -299,7 +290,7 @@ export async function handleSubmission(formData: FormData) {
 
         // Upload the file
         const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("pdfs")
+          .from("attachments")
           .upload(filePath, buffer, {
             contentType: file.type,
             cacheControl: "3600",
@@ -370,6 +361,8 @@ export async function handleSubmission(formData: FormData) {
     console.error("Error in handleSubmission:", error);
     throw error instanceof Error
       ? error
-      : new Error("Failed to process submission");
+      : new Error(
+          "Failed to process submission, please try again in a few minutes."
+        );
   }
 }

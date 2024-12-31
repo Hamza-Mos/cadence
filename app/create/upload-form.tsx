@@ -183,7 +183,7 @@ export default function UploadForm({
                   <Input type="text" {...field} />
                 </FormControl>
                 <FormDescription>
-                  Paste any raw text or URLs here.
+                  Paste any raw text or a URL here.
                 </FormDescription>
                 <FormMessage />
               </FormItem>

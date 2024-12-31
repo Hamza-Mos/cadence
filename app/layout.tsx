@@ -50,15 +50,21 @@ export default function RootLayout({
               </div>
 
               <footer className="w-full flex items-center justify-between border-t mx-auto text-center text-xs gap-8 py-16">
-                <div className="flex flex-col md:flex-row justify-around gap-4 md:gap-12 ml-4 md:ml-12">
+                <div className="w-full flex flex-row justify-start gap-4 md:gap-12 ml-4 md:ml-12">
                   <p>© 2024 Cadance</p>{" "}
                 </div>
-                <div className="flex flex-col justify-around gap-4 mr-4 md:mr-12">
-                  <p className="flex flex-row justify-between gap-2">
-                    <a href="mailto:surajvathsa@gmail.com ">
-                      <EnvelopeIcon className="h-6" />
-                    </a>
-                  </p>
+                <div className="w-full flex flex-col justify-around gap-4 mr-4 md:mr-12">
+                  <div className="flex flex-col justify-between gap-2">
+                    <div className="w-full flex flex-row justify-end">
+                      For help, feedback, issues, chat, feature requests:
+                    </div>
+                    <div className="w-full flex flex-row justify-end">
+                      📞/💬 +1-(310)-500-6711
+                    </div>
+                    <div className="w-full flex flex-row justify-end">
+                      📧 surajvathsa@gmail.com
+                    </div>
+                  </div>
                 </div>
               </footer>
             </div>
