@@ -30,6 +30,8 @@ export default function ChangePhone() {
   };
 
   const handleVerifyChange = async (formData: FormData) => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    formData.append("timezone", timezone);
     formData.append("phone", phone);
     const result = await verifyPhoneChange(formData);
 
