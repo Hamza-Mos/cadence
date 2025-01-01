@@ -300,7 +300,14 @@ export async function handleSubmission(formData: FormData) {
 
     let allChunks: string[] = [];
 
-    // Get user's timezone and check submission limit
+    const canSubmit = await checkUserCanSubmit(supabase, user.id);
+    if (!canSubmit) {
+      throw new Error(
+        `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨`
+      );
+    }
+
+    // Get user's timezone
     const { data: userData, error: userError } = await supabase
       .from("users")
       .select("timezone")
@@ -309,26 +316,51 @@ export async function handleSubmission(formData: FormData) {
 
     if (userError) throw userError;
 
-    const canSubmit = await checkUserCanSubmit(supabase, user.id);
-    if (!canSubmit) {
-      throw new Error(
-        `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨`
-      );
-    }
-
     // Generate a submission ID
     const submission_id = randomUUID();
 
-    // Process files, URLs, and text to get chunks
+    // Handle file uploads
     if (files.length > 0) {
-      // ... (file processing code remains the same)
+      const folderPath = `${user.id}/${submission_id}`;
+
+      // Upload each file and get signed URLs
+      for (const file of files) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const filePath = `${folderPath}/${file.name}`;
+
+        // Upload the file
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("attachments")
+          .upload(filePath, buffer, {
+            contentType: file.type,
+            cacheControl: "3600",
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Get a signed URL for the uploaded file
+        const { data: signedUrlData, error: signedUrlError } =
+          await supabase.storage
+            .from("attachments")
+            .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
+
+        if (signedUrlError || !signedUrlData?.signedUrl) throw signedUrlError;
+
+        // Use the signed URL to access the file
+        const fileResponse = await fetch(signedUrlData.signedUrl);
+        const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+        const pdfChunks = await parsePdf(fileBuffer);
+        allChunks = [...allChunks, ...pdfChunks];
+      }
     }
 
+    // Process URL if provided
     if (url?.trim()) {
       const urlChunks = await scrapeUrl(url);
       allChunks = [...allChunks, ...urlChunks];
     }
 
+    // Process raw text if provided
     if (raw_text) {
       const textChunks = await splitIntoChunks(cleanText(raw_text));
       allChunks = [...allChunks, ...textChunks];
@@ -341,7 +373,7 @@ export async function handleSubmission(formData: FormData) {
     // Generate start time based on submission ID
     const startTime = generateStartTime(submission_id, userData.timezone);
 
-    // Create submission record first
+    // First create the submission record
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .insert({
@@ -360,10 +392,9 @@ export async function handleSubmission(formData: FormData) {
 
     if (submissionError) throw submissionError;
 
-    // Now create messages
+    // Then create all messages
     const messageIds: string[] = [];
 
-    // Create all messages
     for (const chunk of allChunks) {
       const message_id = randomUUID();
       messageIds.push(message_id);
@@ -383,14 +414,14 @@ export async function handleSubmission(formData: FormData) {
       const { error: updateError } = await supabase
         .from("messages")
         .update({
-          next_message_to_send: messageIds[(i + 1) % messageIds.length],
+          next_message_to_send: messageIds[(i + 1) % messageIds.length], // Circular reference for last message
         })
         .eq("message_id", messageIds[i]);
 
       if (updateError) throw updateError;
     }
 
-    // Update submission with first message
+    // Finally, update the submission with the first message to send
     const { error: updateSubmissionError } = await supabase
       .from("submissions")
       .update({
