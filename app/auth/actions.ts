@@ -41,7 +41,7 @@ export async function signUpWithPhone(formData: FormData) {
 
     const customer = await stripe.customers.create({
       name: `${firstName} ${lastName}`,
-      phone: `${areaCode} ${fullPhone}`,
+      phone: `${fullPhone}`,
     });
 
     if (!customer) {
