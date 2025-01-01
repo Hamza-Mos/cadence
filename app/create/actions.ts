@@ -4,20 +4,43 @@ import * as cheerio from "cheerio";
 import pdfParse from "pdf-parse";
 import { createClient } from "@/utils/supabase/server";
 import OpenAI from "openai";
-import { zodResponseFormat } from "openai/helpers/zod";
-import { traceable } from "langsmith/traceable";
-import { wrapOpenAI } from "langsmith/wrappers";
 import { randomUUID } from "crypto";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { z } from "zod";
+import crypto from "crypto";
 
-const openai = wrapOpenAI(
-  new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  })
-);
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
 const MAX_FREE_SUBMISSIONS = 7;
+
+// Helper function to generate a time between 8 AM and 8 PM
+function generateStartTime(submissionId: string, timezone: string): Date {
+  // Create a hash of the submission ID
+  const hash = crypto.createHash("sha256").update(submissionId).digest();
+
+  // Convert first 4 bytes of hash to a number between 0 and 1
+  const randomValue = hash.readUInt32BE(0) / 0xffffffff;
+
+  // Get current date in user's timezone
+  const now = new Date();
+  const userDate = new Date(
+    now.toLocaleString("en-US", { timeZone: timezone })
+  );
+
+  // Calculate minutes since 8 AM (480 minutes) to 8 PM (1200 minutes) = 720 minute range
+  const minutesSince8AM = Math.floor(randomValue * 720);
+
+  // Set time to 8 AM + random minutes
+  userDate.setHours(8, minutesSince8AM, 0, 0);
+
+  // If the generated time is before current time, move to next day
+  if (userDate < now) {
+    userDate.setDate(userDate.getDate() + 1);
+  }
+
+  return userDate;
+}
 
 const cleanText = (text: string): string => {
   return text
@@ -36,35 +59,27 @@ const cleanText = (text: string): string => {
     .trim();
 };
 
-const TextMessages = z.object({
-  text_messages: z.array(z.string()),
-});
-
-const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
-  const systemPrompt = `You are an expert at breaking down and explaining complex information. Break down the content given by a user seeking to understand the content into engaing text messages that will be delivered back to the user in timely intervals. Some rules to follow are:
-    1. Each text message must be around 4-5 sentences under 1000 characters total.
-    2. Make each text message focus on a single concept, topic, idea, or quote from the content.
-    3. Write in a text message style while keeping the information accurate.
-    4. Ensure each text message is self-contained and easily understood.
+const splitIntoChunks = async (text: string): Promise<string[]> => {
+  const systemPrompt = `You are an expert at breaking down complex information into simple, engaging text messages. Your task is to:
+    1. Break down the given text into bite-sized chunks of 4-5 sentences each
+    2. Make each chunk focus on a single concept, topic, idea, or quote.
+    3. Write in a text-message friendly style while keeping the information accurate.
+    4. Ensure each chunk is self-contained and easily understood,
     5. Use simple language and explanatory analogies where helpful.
-    6. Exclude any unnecessary information that may be present in the content. This includes information about the author, references, any small talk, introductory content etc. that doesn't have meaningful informational value to the reader.
-    7. Make the information memorable and easy to understand.
-    8. If the body of text is instructional, break it into clear, actionable steps.
-    9. Ignore any content related to appendix or index. Only generate messages on the main content of the material.
-    10. DO NOT EXCEED more than 5 messages in total.
+    6. Keep each chunk under 1000 characters.
+    7. Remove any unnecessary information or redundant content - this includes information about the author, any small talk, introductory content etc. that doesn't have meaningful informational value.
+    8. Make the information memorable and easy to understand.
+    9. If the text is instructional, break it into clear, actionable steps.
+    10. Ignore any content related to appendix or index. Only generate messages on the main content of the material.
   
-  Output format should be a series of text messages. Do not include a message that only introduces the topic, remember each text message should have some informational value.
-
-  Informational value can be determined based on the content. If its a blogpost or interview, capture the main essence, teachings and quotes. If its an academic paper, capture the main technique and results. If its a news article, capture the main events. and so on.
+  Output format should be a series of chunks separated by "|||". Each chunk should be a self-contained message. Do not include a message that introduces the topic, remember each message should have some informational value.
   
-  For example, if given a technical article about photosynthesis, good text messages would be:
-   - "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves."
-   - "💧 Water plays a huge role in photosynthesis! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food!"
-  `;
+  For example, if given a technical article about photosynthesis, good chunks would be:
+  "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves." ||| "💧 Water plays a huge role in photosynthesis! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food!"`;
 
   try {
     // Split text into smaller segments if it's too long
-    const maxCharsPerRequest = 20000; // Safe limit for context window
+    const maxCharsPerRequest = 4000; // Safe limit for context window
     const textSegments = [];
     for (let i = 0; i < text.length; i += maxCharsPerRequest) {
       textSegments.push(text.slice(i, i + maxCharsPerRequest));
@@ -74,8 +89,8 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
 
     // Process each segment
     for (const segment of textSegments) {
-      const completion = await openai.beta.chat.completions.parse({
-        model: "gpt-4o",
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4",
         messages: [
           {
             role: "system",
@@ -83,15 +98,14 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
           },
           {
             role: "user",
-            content: `${segment}`,
+            content: `Please break this text into engaging, informative chunks that feel like text messages: ${segment}`,
           },
         ],
         temperature: 0.7,
         max_tokens: 2000,
-        response_format: zodResponseFormat(TextMessages, "messages"),
       });
 
-      const response = completion.choices[0].message.parsed;
+      const response = completion.choices[0]?.message?.content;
 
       if (!response) {
         console.warn("No response from GPT for segment");
@@ -99,7 +113,8 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
       }
 
       // Split response into chunks and add to collection
-      const newChunks = response.text_messages
+      const newChunks = response
+        .split("|||")
         .map((chunk) => chunk.trim())
         .filter((chunk) => chunk.length > 0);
       allChunks = [...allChunks, ...newChunks];
@@ -107,13 +122,12 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
 
     // Validate chunks
     allChunks = allChunks.filter((chunk) => {
-      // Ensure each chunk is within size limits and has actual content
       return (
         chunk.length > 0 &&
         chunk.length <= 1000 && // Match database constraint
-        chunk.split(/[.!?]+/).length >= 2 &&
+        chunk.split(/[.!?]+/).length >= 2 && // At least 2 sentences
         !chunk.slice(0, 10).toLowerCase().includes("i'm sorry")
-      ); // At least 2 sentences
+      );
     });
 
     if (allChunks.length === 0) {
@@ -129,8 +143,6 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
         .filter((chunk) => chunk.trim().length > 0);
     }
 
-    console.log("All chunks:", allChunks);
-
     return allChunks;
   } catch (error) {
     console.error("Error in GPT text chunking:", error);
@@ -144,7 +156,7 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
       }, [])
       .filter((chunk) => chunk.trim().length > 0);
   }
-});
+};
 
 export async function scrapeUrl(url: string) {
   try {
@@ -199,8 +211,7 @@ export async function scrapeUrl(url: string) {
     }
 
     const cleanedText = cleanText(mainContent);
-    const chunks = await splitIntoChunks(cleanedText);
-    return chunks;
+    return splitIntoChunks(cleanedText);
   } catch (error) {
     console.error("Error scraping URL:", error);
     throw new Error("Failed to scrape URL");
@@ -247,9 +258,7 @@ export async function parsePdf(file: Buffer) {
     });
 
     const cleanedText = cleanText(data.text);
-    console.log("Cleaned text:", cleanedText);
-    const chunks = await splitIntoChunks(cleanedText);
-    return chunks;
+    return splitIntoChunks(cleanedText);
   } catch (error) {
     console.error("Error parsing PDF:", error);
     throw new Error("Failed to parse PDF");
@@ -283,19 +292,26 @@ export async function handleSubmission(formData: FormData) {
 
     let allChunks: string[] = [];
 
-    // Check if user can submit
     const canSubmit = await checkUserCanSubmit(supabase, user.id);
-
     if (!canSubmit) {
       throw new Error(
         `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨`
       );
     }
 
+    // Get user's timezone
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("timezone")
+      .eq("id", user.id)
+      .single();
+
+    if (userError) throw userError;
+
     // Generate a submission ID
     const submission_id = randomUUID();
 
-    // Upload PDF if provided
+    // Handle file uploads
     if (files.length > 0) {
       const folderPath = `${user.id}/${submission_id}`;
 
@@ -330,22 +346,6 @@ export async function handleSubmission(formData: FormData) {
       }
     }
 
-    // Create submission record
-    const { data: submission, error: submissionError } = await supabase
-      .from("submissions")
-      .insert({
-        submission_id: submission_id,
-        user_id: user.id,
-        text_field: url?.trim() || raw_text || null,
-        uploaded_files: files.map((file) => file.name),
-        cadence,
-        repeat,
-      })
-      .select()
-      .single();
-
-    if (submissionError) throw submissionError;
-
     // Process URL if provided
     if (url?.trim()) {
       const urlChunks = await scrapeUrl(url);
@@ -357,22 +357,68 @@ export async function handleSubmission(formData: FormData) {
       allChunks = [...allChunks, ...textChunks];
     }
 
-    // Insert all chunks into database
+    // Create messages with linked list structure
     if (allChunks.length > 0) {
-      const { error: cadenceError } = await supabase.from("cadences").insert(
-        allChunks.map((chunk) => ({
-          submission_id: submission.submission_id,
-          message_text: chunk,
-        }))
-      );
-      if (cadenceError) throw cadenceError;
-    }
+      const messageIds: string[] = [];
 
-    return {
-      success: true,
-      submission_id: submission.submission_id,
-      chunks_count: allChunks.length,
-    };
+      // Create all messages first
+      for (const chunk of allChunks) {
+        const message_id = randomUUID();
+        messageIds.push(message_id);
+
+        const { error: messageError } = await supabase.from("messages").insert({
+          message_id: message_id,
+          submission_id: submission_id,
+          message_text: chunk,
+          timezone: userData.timezone,
+        });
+
+        if (messageError) throw messageError;
+      }
+
+      // Update next_message_to_send for each message
+      for (let i = 0; i < messageIds.length; i++) {
+        const { error: updateError } = await supabase
+          .from("messages")
+          .update({
+            next_message_to_send: messageIds[(i + 1) % messageIds.length], // Circular reference for last message
+          })
+          .eq("message_id", messageIds[i]);
+
+        if (updateError) throw updateError;
+      }
+
+      // Generate start time based on submission ID
+      const startTime = generateStartTime(submission_id, userData.timezone);
+
+      // Create submission record with first message
+      const { data: submission, error: submissionError } = await supabase
+        .from("submissions")
+        .insert({
+          submission_id: submission_id,
+          user_id: user.id,
+          text_field: url?.trim() || raw_text || null,
+          uploaded_files: files.map((file) => file.name),
+          cadence,
+          repeat,
+          message_to_send: messageIds[0], // Set first message
+          start_time: startTime.toISOString(),
+          timezone: userData.timezone,
+          last_sent_time: null,
+        })
+        .select()
+        .single();
+
+      if (submissionError) throw submissionError;
+
+      return {
+        success: true,
+        submission_id: submission_id,
+        chunks_count: allChunks.length,
+      };
+    } else {
+      throw new Error("No content was extracted from the provided source");
+    }
   } catch (error) {
     console.error("Error in handleSubmission:", error);
     throw error instanceof Error

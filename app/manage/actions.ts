@@ -44,14 +44,36 @@ export async function handleGetSubmissions() {
 
 export async function handleDeleteSubmission(uuid: string) {
   const supabase = await createClient();
-  console.log("uuid", uuid);
-  const { error } = await supabase
-    .from("submissions")
-    .delete()
-    .eq("submission_id", uuid);
+  console.log("Deleting submission:", uuid);
 
-  if (error) {
-    throw new Error("Error deleting submission");
+  try {
+    // delete the submission
+    const { error: submissionError } = await supabase
+      .from("submissions")
+      .delete()
+      .eq("submission_id", uuid);
+
+    if (submissionError) {
+      console.error("Error deleting submission:", submissionError);
+      throw submissionError;
+    }
+
+    // delete any uploaded files
+    const { data: user } = await supabase.auth.getUser();
+    if (user.user) {
+      const folderPath = `${user.user.id}/${uuid}`;
+      const { error: storageError } = await supabase.storage
+        .from("attachments")
+        .remove([folderPath]);
+
+      if (storageError) {
+        console.error("Error deleting files:", storageError);
+        // don't throw here as the main deletion was successful
+      }
+    }
+  } catch (error) {
+    console.error("Error in deletion process:", error);
+    throw new Error("Error deleting submission and associated data");
   }
 
   redirect("/manage");
