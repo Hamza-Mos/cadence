@@ -7,12 +7,22 @@ import OpenAI from "openai";
 import { randomUUID } from "crypto";
 import { SupabaseClient } from "@supabase/supabase-js";
 import crypto from "crypto";
+import { zodResponseFormat } from "openai/helpers/zod";
+import { traceable } from "langsmith/traceable";
+import { wrapOpenAI } from "langsmith/wrappers";
+import { z } from "zod";
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = wrapOpenAI(
+  new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  })
+);
 
 const MAX_FREE_SUBMISSIONS = 7;
+
+const TextMessages = z.object({
+  text_messages: z.array(z.string()),
+});
 
 // Helper function to generate a time between 8 AM and 8 PM
 function generateStartTime(submissionId: string, timezone: string): Date {
@@ -66,28 +76,31 @@ const cleanText = (text: string): string => {
     .replace(/\s{2,}/g, " ") // Replace multiple spaces with single space
     .trim();
 };
-
-const splitIntoChunks = async (text: string): Promise<string[]> => {
-  const systemPrompt = `You are an expert at breaking down complex information into simple, engaging text messages. Your task is to:
-    1. Break down the given text into bite-sized chunks of 4-5 sentences each
-    2. Make each chunk focus on a single concept, topic, idea, or quote.
-    3. Write in a text-message friendly style while keeping the information accurate.
-    4. Ensure each chunk is self-contained and easily understood,
-    5. Use simple language and explanatory analogies where helpful.
-    6. Keep each chunk under 1000 characters.
-    7. Remove any unnecessary information or redundant content - this includes information about the author, any small talk, introductory content etc. that doesn't have meaningful informational value.
-    8. Make the information memorable and easy to understand.
-    9. If the text is instructional, break it into clear, actionable steps.
-    10. Ignore any content related to appendix or index. Only generate messages on the main content of the material.
+const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
+  const systemPrompt = `You are an expert at breaking down and explaining complex information. Break down the content given by a user seeking to understand the content into engaing text messages that will be delivered back to the user in timely intervals. Some rules to follow are:
+      1. Each text message must be around 4-5 sentences under 1000 characters total.
+      2. Make each text message focus on a single concept, topic, idea, or quote from the content.
+      3. Write in a text message style while keeping the information accurate.
+      4. Ensure each text message is self-contained and easily understood.
+      5. Use simple language and explanatory analogies where helpful.
+      6. Exclude any unnecessary information that may be present in the content. This includes information about the author, references, any small talk, introductory content etc. that doesn't have meaningful informational value to the reader.
+      7. Make the information memorable and easy to understand.
+      8. If the body of text is instructional, break it into clear, actionable steps.
+      9. Ignore any content related to appendix or index. Only generate messages on the main content of the material.
+      10. DO NOT EXCEED more than 5 messages in total.
+    
+    Output format should be a series of text messages. Do not include a message that only introduces the topic, remember each text message should have some informational value.
   
-  Output format should be a series of chunks separated by "|||". Each chunk should be a self-contained message. Do not include a message that introduces the topic, remember each message should have some informational value.
-  
-  For example, if given a technical article about photosynthesis, good chunks would be:
-  "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves." ||| "💧 Water plays a huge role in photosynthesis! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food!"`;
+    Informational value can be determined based on the content. If its a blogpost or interview, capture the main essence, teachings and quotes. If its an academic paper, capture the main technique and results. If its a news article, capture the main events. and so on.
+    
+    For example, if given a technical article about photosynthesis, good text messages would be:
+     - "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves."
+     - "💧 Water plays a huge role in photosynthesis! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food!"
+    `;
 
   try {
     // Split text into smaller segments if it's too long
-    const maxCharsPerRequest = 4000; // Safe limit for context window
+    const maxCharsPerRequest = 20000; // Safe limit for context window
     const textSegments = [];
     for (let i = 0; i < text.length; i += maxCharsPerRequest) {
       textSegments.push(text.slice(i, i + maxCharsPerRequest));
@@ -97,8 +110,8 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
 
     // Process each segment
     for (const segment of textSegments) {
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4",
+      const completion = await openai.beta.chat.completions.parse({
+        model: "gpt-4o",
         messages: [
           {
             role: "system",
@@ -106,14 +119,15 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
           },
           {
             role: "user",
-            content: `Please break this text into engaging, informative chunks that feel like text messages: ${segment}`,
+            content: `${segment}`,
           },
         ],
         temperature: 0.7,
         max_tokens: 2000,
+        response_format: zodResponseFormat(TextMessages, "messages"),
       });
 
-      const response = completion.choices[0]?.message?.content;
+      const response = completion.choices[0].message.parsed;
 
       if (!response) {
         console.warn("No response from GPT for segment");
@@ -121,8 +135,7 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
       }
 
       // Split response into chunks and add to collection
-      const newChunks = response
-        .split("|||")
+      const newChunks = response.text_messages
         .map((chunk) => chunk.trim())
         .filter((chunk) => chunk.length > 0);
       allChunks = [...allChunks, ...newChunks];
@@ -130,12 +143,13 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
 
     // Validate chunks
     allChunks = allChunks.filter((chunk) => {
+      // Ensure each chunk is within size limits and has actual content
       return (
         chunk.length > 0 &&
         chunk.length <= 1000 && // Match database constraint
-        chunk.split(/[.!?]+/).length >= 2 && // At least 2 sentences
+        chunk.split(/[.!?]+/).length >= 2 &&
         !chunk.slice(0, 10).toLowerCase().includes("i'm sorry")
-      );
+      ); // At least 2 sentences
     });
 
     if (allChunks.length === 0) {
@@ -151,6 +165,8 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
         .filter((chunk) => chunk.trim().length > 0);
     }
 
+    console.log("All chunks:", allChunks);
+
     return allChunks;
   } catch (error) {
     console.error("Error in GPT text chunking:", error);
@@ -164,7 +180,7 @@ const splitIntoChunks = async (text: string): Promise<string[]> => {
       }, [])
       .filter((chunk) => chunk.trim().length > 0);
   }
-};
+});
 
 export async function scrapeUrl(url: string) {
   try {
@@ -219,7 +235,8 @@ export async function scrapeUrl(url: string) {
     }
 
     const cleanedText = cleanText(mainContent);
-    return splitIntoChunks(cleanedText);
+    const chunks = await splitIntoChunks(cleanedText);
+    return chunks;
   } catch (error) {
     console.error("Error scraping URL:", error);
     throw new Error("Failed to scrape URL");
@@ -266,7 +283,8 @@ export async function parsePdf(file: Buffer) {
     });
 
     const cleanedText = cleanText(data.text);
-    return splitIntoChunks(cleanedText);
+    const chunks = await splitIntoChunks(cleanedText);
+    return chunks;
   } catch (error) {
     console.error("Error parsing PDF:", error);
     throw new Error("Failed to parse PDF");
