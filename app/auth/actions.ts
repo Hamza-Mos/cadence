@@ -57,12 +57,13 @@ export async function signUpWithPhone(formData: FormData) {
           last_name: lastName,
           area_code: areaCode,
           stripe_id: customer.id,
-          timezone: timezone, // Include timezone in metadata
+          timezone: timezone,
         },
       },
     });
 
     if (error) {
+      console.log("error: ", error);
       return { error: error.message };
     }
 
@@ -111,7 +112,7 @@ export async function verifySignUpOtp(formData: FormData) {
       last_name: metadata.last_name,
       area_code: metadata.area_code,
       stripe_id: metadata.stripe_id,
-      phone: metadata.phone_number,
+      phone_number: metadata.phone_number,
       timezone: metadata.timezone, // Include timezone
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -150,6 +151,8 @@ export async function requestPhoneChange(formData: FormData) {
     return {
       success: true,
       phone: fullPhone,
+      areaCode, // Add this
+      phoneNumber, // Add this
     };
   } catch (error) {
     return {
@@ -163,6 +166,8 @@ export async function verifyPhoneChange(formData: FormData) {
   const phone = formData.get("phone") as string;
   const token = formData.get("token") as string;
   const timezone = formData.get("timezone") as string;
+  const areaCode = formData.get("areaCode") as string; // Add this
+  const phoneNumber = formData.get("phoneNumber") as string; // Add this
 
   try {
     const { data, error: verifyError } = await supabase.auth.verifyOtp({
@@ -184,13 +189,10 @@ export async function verifyPhoneChange(formData: FormData) {
       return { error: "Failed to get user details" };
     }
 
-    const areaCode = phone.split("+")[1].slice(0, -10);
-    const phoneNumber = phone.slice(-10);
-
     // Update user profile with new phone and timezone if provided
     const updateData: any = {
-      phone: phoneNumber,
-      area_code: areaCode,
+      phone_number: phoneNumber,
+      area_code: areaCode, // Use the passed area code
       updated_at: new Date().toISOString(),
     };
 

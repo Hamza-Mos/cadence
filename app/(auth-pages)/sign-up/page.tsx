@@ -23,9 +23,10 @@ export default function SignUp() {
   const router = useRouter();
 
   const handleSendCode = async (formData: FormData) => {
-    const result = await signUpWithPhone(formData);
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     formData.append("timezone", timezone);
+
+    const result = await signUpWithPhone(formData);
 
     if ("error" in result) {
       setMessage({ error: result.error });
