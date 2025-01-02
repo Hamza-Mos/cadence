@@ -56,7 +56,7 @@ function generateStartTime(
 ): Date {
   // Create a hash of the submission ID
   const hash = crypto.createHash("sha256").update(submissionId).digest();
-  const randomValue = hash.readUInt32BE(0) / 0xffffffff;
+  const randomValue = hash.readUInt32BE(0) / 0xffffffff; // number between 0 and 1
 
   // Get current date in user's timezone
   const now = new Date();
@@ -481,6 +481,7 @@ export async function handleSubmission(formData: FormData) {
       .from("submissions")
       .update({
         message_to_send: messageIds[0],
+        first_message_id: messageIds[0],
       })
       .eq("submission_id", submission_id);
 
