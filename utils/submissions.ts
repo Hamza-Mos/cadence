@@ -20,6 +20,8 @@ interface Message {
   last_sent_time: string | null;
 }
 
+type RepeatOption = "repeat-forever" | "do-not-repeat";
+
 interface Submission {
   submission_id: string;
   user_id: string;
@@ -28,7 +30,7 @@ interface Submission {
   last_sent_time: string | null;
   start_time: string;
   cadence: string;
-  repeat: string;
+  repeat: RepeatOption;
   timezone: string;
 }
 
