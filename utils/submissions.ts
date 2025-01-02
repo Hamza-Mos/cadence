@@ -39,7 +39,8 @@ export async function getSubmissionsForProcessing(supabase: SupabaseClient) {
     .select(`
       *,
       users!inner (
-        phone,
+        area_code,
+        phone_number,
         timezone
       )
     `);

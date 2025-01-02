@@ -32,28 +32,63 @@ export async function processMessages(
     const results: MessageResult[] = [];
 
     // Get submissions to process
-    const submissions = options.submissionId
-      ? [
-          await supabase
-            .from("submissions")
-            .select(
-              `
-              *,
-              users!inner (
-                phone,
-                timezone
-              )
-            `
+    let submissions;
+    if (options.submissionId) {
+      // If specific submission ID is provided
+      const { data, error } = await supabase
+        .from("submissions")
+        .select(
+          `
+            *,
+            users!inner (
+              area_code,
+              phone_number,
+              timezone
             )
-            .eq("submission_id", options.submissionId)
-            .single()
-            .then((res) => res.data),
-        ]
-      : await getSubmissionsForProcessing(supabase);
+          `
+        )
+        .eq("submission_id", options.submissionId)
+        .single();
+
+      if (error) {
+        console.error("Error fetching specific submission:", error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error(`Submission not found: ${options.submissionId}`);
+      }
+
+      submissions = [data];
+    } else {
+      // Get all submissions
+      const { data, error } = await supabase.from("submissions").select(`
+            *,
+            users!inner (
+              area_code,
+              phone_number,
+              timezone
+            )
+          `);
+
+      if (error) throw error;
+      submissions = data || [];
+    }
+
+    console.log(
+      "Processing submissions:",
+      submissions.map((s) => s?.submission_id)
+    );
 
     // Process each submission
     for (const submission of submissions) {
+      if (!submission) {
+        console.warn("Skipping null submission");
+        continue;
+      }
+
       try {
+        // Skip time check if this is an immediate send
         if (
           !options.skipTimeCheck &&
           !shouldSendMessage(submission, currentTime)
@@ -61,16 +96,23 @@ export async function processMessages(
           continue;
         }
 
+        // Get current message details
         const currentMessage = await getCurrentMessage(
           supabase,
           submission.message_to_send
         );
 
+        if (!currentMessage) {
+          throw new Error(`Message not found: ${submission.message_to_send}`);
+        }
+
+        // Send the message
         await sendTextMessage(
-          submission.users.phone,
+          `+${submission.users.area_code}${submission.users.phone_number}`,
           currentMessage.message_text
         );
 
+        // Update database after successful send
         await updateAfterSend(
           supabase,
           submission,
@@ -84,7 +126,7 @@ export async function processMessages(
         });
       } catch (error) {
         console.error(
-          `Error processing submission ${submission.submission_id}:`,
+          `Error processing submission ${submission?.submission_id}:`,
           error
         );
         results.push({

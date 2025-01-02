@@ -1,13 +1,22 @@
+// utils/twilio.ts
 import { Twilio } from "twilio";
 
-const twilioClient = new Twilio(
-  process.env.TWILIO_ACCOUNT_SID!,
-  process.env.TWILIO_AUTH_TOKEN!
-);
+let twilioClient: Twilio | null = null;
+
+function getTwilioClient() {
+  if (!twilioClient) {
+    twilioClient = new Twilio(
+      process.env.TWILIO_ACCOUNT_SID!,
+      process.env.TWILIO_AUTH_TOKEN!
+    );
+  }
+  return twilioClient;
+}
 
 export async function sendTextMessage(to: string, message: string) {
   try {
-    const result = await twilioClient.messages.create({
+    const client = getTwilioClient();
+    const result = await client.messages.create({
       body: message,
       to,
       from: process.env.TWILIO_PHONE_NUMBER!,
