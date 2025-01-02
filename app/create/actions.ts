@@ -11,6 +11,7 @@ import { zodResponseFormat } from "openai/helpers/zod";
 import { traceable } from "langsmith/traceable";
 import { wrapOpenAI } from "langsmith/wrappers";
 import { z } from "zod";
+import { processMessages } from "@/utils/messages";
 
 const openai = wrapOpenAI(
   new OpenAI({
@@ -486,6 +487,11 @@ export async function handleSubmission(formData: FormData) {
       .eq("submission_id", submission_id);
 
     if (updateSubmissionError) throw updateSubmissionError;
+
+    await processMessages(supabase, {
+      submissionId: submission_id,
+      skipTimeCheck: true, // Skip time-based checks for immediate send
+    });
 
     return {
       success: true,
