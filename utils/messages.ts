@@ -34,6 +34,7 @@ export async function processMessages(
 
     // Get submissions to process
     let submissions;
+    console.log("options: ", options);
     if (options.submissionId) {
       // If specific submission ID is provided
       const { data, error } = await supabase
@@ -72,9 +73,12 @@ export async function processMessages(
               )
             `);
 
+      console.log("error: ", error);
+      console.log("raw data: ", data);
+
       if (error) throw error;
-      console.log("all submissions: ", submissions);
       submissions = data || [];
+      console.log("all submissions: ", submissions);
     }
 
     console.log(
