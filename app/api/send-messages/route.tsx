@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { createClient } from "@/utils/supabase/server";
+import { createServiceClient } from "@/utils/supabase/server";
 import { processMessages } from "@/utils/messages";
 
 export async function GET(request: NextRequest) {
@@ -9,7 +9,7 @@ export async function GET(request: NextRequest) {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const supabase = await createClient();
+  const supabase = await createServiceClient();
   const result = await processMessages(supabase);
 
   return Response.json(result, {
