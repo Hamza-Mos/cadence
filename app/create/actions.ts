@@ -491,6 +491,7 @@ export async function handleSubmission(formData: FormData) {
     await processMessages(supabase, {
       submissionId: submission_id,
       skipTimeCheck: true, // Skip time-based checks for immediate send
+      isFirstMessage: true,
     });
 
     return {

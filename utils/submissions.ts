@@ -97,19 +97,22 @@ export async function updateAfterSend(
   supabase: SupabaseClient,
   submission: Submission,
   currentMessage: Message,
-  currentTime: Date
+  currentTime: Date,
+  skipLastSentUpdate: boolean = false
 ) {
   const updates = [
-    // Update submission
+    // Update submission - always update message_to_send, conditionally update last_sent_time
     supabase
       .from("submissions")
       .update({
-        last_sent_time: currentTime.toISOString(),
         message_to_send: currentMessage.next_message_to_send,
+        ...(skipLastSentUpdate
+          ? {}
+          : { last_sent_time: currentTime.toISOString() }),
       })
       .eq("submission_id", submission.submission_id),
 
-    // Update current message
+    // Always update message last_sent_time
     supabase
       .from("messages")
       .update({

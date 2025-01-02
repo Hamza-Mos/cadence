@@ -25,6 +25,7 @@ export async function processMessages(
   options: {
     submissionId?: string;
     skipTimeCheck?: boolean;
+    isFirstMessage?: boolean;
   } = {}
 ): Promise<ProcessMessageResult> {
   try {
@@ -39,13 +40,13 @@ export async function processMessages(
         .from("submissions")
         .select(
           `
-            *,
-            users!inner (
-              area_code,
-              phone_number,
-              timezone
-            )
-          `
+              *,
+              users!inner (
+                area_code,
+                phone_number,
+                timezone
+              )
+            `
         )
         .eq("submission_id", options.submissionId)
         .single();
@@ -63,13 +64,13 @@ export async function processMessages(
     } else {
       // Get all submissions
       const { data, error } = await supabase.from("submissions").select(`
-            *,
-            users!inner (
-              area_code,
-              phone_number,
-              timezone
-            )
-          `);
+              *,
+              users!inner (
+                area_code,
+                phone_number,
+                timezone
+              )
+            `);
 
       if (error) throw error;
       submissions = data || [];
@@ -107,17 +108,20 @@ export async function processMessages(
         }
 
         // Send the message
-        await sendTextMessage(
-          `+${submission.users.area_code}${submission.users.phone_number}`,
-          currentMessage.message_text
-        );
+        const fullPhone =
+          `+${submission.users.area_code}${submission.users.phone_number}`.replace(
+            /\s+/g,
+            ""
+          );
+        await sendTextMessage(fullPhone, currentMessage.message_text);
 
-        // Update database after successful send
+        // For first message, skip updating last_sent_time but still update message_to_send
         await updateAfterSend(
           supabase,
           submission,
           currentMessage,
-          currentTime
+          currentTime,
+          options.isFirstMessage
         );
 
         results.push({
