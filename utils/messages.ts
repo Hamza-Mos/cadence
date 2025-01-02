@@ -63,6 +63,27 @@ export async function processMessages(
 
       submissions = [data];
     } else {
+      const { data: submissionsOnly } = await supabase
+        .from("submissions")
+        .select("*");
+      console.log("submissions without join:", submissionsOnly);
+
+      const { data: usersOnly } = await supabase.from("users").select("*");
+      console.log("users:", usersOnly);
+
+      // Original query with left join
+      const { data: usersLeftJoin } = await supabase.from("submissions")
+        .select(`
+            *,
+            users!left (
+                area_code,
+                phone_number,
+                timezone
+            )
+            `);
+
+      console.log("usersLeftJoin:", usersLeftJoin);
+
       // Get all submissions
       const { data, error } = await supabase.from("submissions").select(`
               *,
@@ -74,7 +95,7 @@ export async function processMessages(
             `);
 
       console.log("error: ", error);
-      console.log("raw data: ", data);
+      console.log("raw data with inner join: ", data);
 
       if (error) throw error;
       submissions = data || [];
