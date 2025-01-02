@@ -24,40 +24,73 @@ const TextMessages = z.object({
   text_messages: z.array(z.string()),
 });
 
-// Helper function to generate a time between 8 AM and 8 PM
-function generateStartTime(submissionId: string, timezone: string): Date {
-  console.log("hashing submission id: ", submissionId);
+type CadenceMap = {
+  [key: string]: number;
+};
+
+const CADENCE_HOURS: CadenceMap = {
+  "receive-daily": 24,
+  "receive-12": 12,
+  "receive-6": 6,
+  "receive-4": 4,
+  "receive-1": 1,
+};
+
+/**
+ * Generates a start time for message delivery based on submission ID.
+ * Start time will be:
+ * - Between 8 AM - 8 PM in user's timezone (waking hours)
+ * - After minimum cadence period from current time
+ * - Today or tomorrow only
+ * - Deterministically random (same ID = same time) to help avoid collisions
+ *
+ * @param submissionId - UUID of the submission
+ * @param timezone - User's timezone string (e.g. "America/New_York")
+ * @param cadence - Frequency of messages (e.g. "receive-4" for 4 hours)
+ * @returns Date object with calculated start time
+ */
+function generateStartTime(
+  submissionId: string,
+  timezone: string,
+  cadence: string
+): Date {
   // Create a hash of the submission ID
   const hash = crypto.createHash("sha256").update(submissionId).digest();
-
-  // Convert first 4 bytes of hash to a number between 0 and 1
   const randomValue = hash.readUInt32BE(0) / 0xffffffff;
-
-  console.log("random value: ", randomValue);
 
   // Get current date in user's timezone
   const now = new Date();
-  const userDate = new Date(
-    now.toLocaleString("en-US", { timeZone: timezone })
-  );
+  const userNow = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
 
-  // Calculate minutes since 8 AM (480 minutes) to 8 PM (1200 minutes) = 720 minute range
-  const minutesSince8AM = Math.floor(randomValue * 720);
-  console.log("minutes since 8 am:", minutesSince8AM);
+  // Get cadence hours
+  const cadenceHours = CADENCE_HOURS[cadence] || 24;
 
-  // Set time to 8 AM + random minutes
-  userDate.setHours(8, minutesSince8AM, 0, 0);
+  // Calculate minimum time based on cadence
+  const minTime = new Date(userNow);
+  minTime.setHours(minTime.getHours() + cadenceHours);
 
-  console.log("user date: ", userDate);
-
-  // If the generated time is before current time, move to next day
-  if (userDate < now) {
-    userDate.setDate(userDate.getDate() + 1);
+  // If minimum time is today but before 8 AM, set to 8 AM
+  if (minTime.getHours() < 8) {
+    minTime.setHours(8, 0, 0, 0);
   }
 
-  console.log("user date after check: ", userDate);
+  // If minimum time is after 8 PM today, set to 8 AM tomorrow
+  if (minTime.getHours() >= 20) {
+    minTime.setDate(minTime.getDate() + 1);
+    minTime.setHours(8, 0, 0, 0);
+  }
 
-  return userDate;
+  // Calculate available minutes in the valid window
+  const startHour = minTime.getHours();
+  const endHour = 20; // 8 PM
+  const availableMinutes = (endHour - startHour) * 60;
+
+  const minuteOffset = Math.floor(randomValue * availableMinutes);
+
+  const finalTime = new Date(minTime);
+  finalTime.setMinutes(finalTime.getMinutes() + minuteOffset);
+
+  return finalTime;
 }
 
 const cleanText = (text: string): string => {
@@ -389,7 +422,11 @@ export async function handleSubmission(formData: FormData) {
     }
 
     // Generate start time based on submission ID
-    const startTime = generateStartTime(submission_id, userData.timezone);
+    const startTime = generateStartTime(
+      submission_id,
+      userData.timezone,
+      cadence
+    );
 
     // First create the submission record
     const { data: submission, error: submissionError } = await supabase
