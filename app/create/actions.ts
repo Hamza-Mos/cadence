@@ -4,12 +4,14 @@ import * as cheerio from "cheerio";
 import pdfParse from "pdf-parse";
 import { createClient } from "@/utils/supabase/server";
 import OpenAI from "openai";
+import { randomUUID } from "crypto";
+import { SupabaseClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 import { zodResponseFormat } from "openai/helpers/zod";
 import { traceable } from "langsmith/traceable";
 import { wrapOpenAI } from "langsmith/wrappers";
-import { randomUUID } from "crypto";
-import { SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
+import { processMessages } from "@/utils/messages";
 
 const openai = wrapOpenAI(
   new OpenAI({
@@ -18,6 +20,79 @@ const openai = wrapOpenAI(
 );
 
 const MAX_FREE_SUBMISSIONS = 7;
+
+const TextMessages = z.object({
+  text_messages: z.array(z.string()),
+});
+
+type CadenceMap = {
+  [key: string]: number;
+};
+
+const CADENCE_HOURS: CadenceMap = {
+  "receive-daily": 24,
+  "receive-12": 12,
+  "receive-6": 6,
+  "receive-4": 4,
+  "receive-1": 1,
+};
+
+/**
+ * Generates a start time for message delivery based on submission ID.
+ * Start time will be:
+ * - Between 8 AM - 8 PM in user's timezone (waking hours)
+ * - After minimum cadence period from current time
+ * - Today or tomorrow only
+ * - Deterministically random (same ID = same time) to help avoid collisions
+ *
+ * @param submissionId - UUID of the submission
+ * @param timezone - User's timezone string (e.g. "America/New_York")
+ * @param cadence - Frequency of messages (e.g. "receive-4" for 4 hours)
+ * @returns Date object with calculated start time
+ */
+function generateStartTime(
+  submissionId: string,
+  timezone: string,
+  cadence: string
+): Date {
+  // Create a hash of the submission ID
+  const hash = crypto.createHash("sha256").update(submissionId).digest();
+  const randomValue = hash.readUInt32BE(0) / 0xffffffff; // number between 0 and 1
+
+  // Get current date in user's timezone
+  const now = new Date();
+  const userNow = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+
+  // Get cadence hours
+  const cadenceHours = CADENCE_HOURS[cadence] || 24;
+
+  // Calculate minimum time based on cadence
+  const minTime = new Date(userNow);
+  minTime.setHours(minTime.getHours() + cadenceHours);
+
+  // If minimum time is today but before 8 AM, set to 8 AM
+  if (minTime.getHours() < 8) {
+    minTime.setHours(8, 0, 0, 0);
+  }
+
+  // If minimum time is after 8 PM today, set to 8 AM tomorrow
+  if (minTime.getHours() >= 20) {
+    minTime.setDate(minTime.getDate() + 1);
+    minTime.setHours(8, 0, 0, 0);
+  }
+
+  // Calculate available minutes in the valid window
+  const startHour = minTime.getHours();
+  const endHour = 20; // 8 PM
+  const availableMinutes = (endHour - startHour) * 60;
+
+  const minuteOffset = Math.floor(randomValue * availableMinutes);
+
+  const finalTime = new Date(minTime);
+  finalTime.setMinutes(finalTime.getMinutes() + minuteOffset);
+
+  return finalTime;
+}
 
 const cleanText = (text: string): string => {
   return text
@@ -35,32 +110,27 @@ const cleanText = (text: string): string => {
     .replace(/\s{2,}/g, " ") // Replace multiple spaces with single space
     .trim();
 };
-
-const TextMessages = z.object({
-  text_messages: z.array(z.string()),
-});
-
 const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
   const systemPrompt = `You are an expert at breaking down and explaining complex information. Break down the content given by a user seeking to understand the content into engaing text messages that will be delivered back to the user in timely intervals. Some rules to follow are:
-    1. Each text message must be around 4-5 sentences under 1000 characters total.
-    2. Make each text message focus on a single concept, topic, idea, or quote from the content.
-    3. Write in a text message style while keeping the information accurate.
-    4. Ensure each text message is self-contained and easily understood.
-    5. Use simple language and explanatory analogies where helpful.
-    6. Exclude any unnecessary information that may be present in the content. This includes information about the author, references, any small talk, introductory content etc. that doesn't have meaningful informational value to the reader.
-    7. Make the information memorable and easy to understand.
-    8. If the body of text is instructional, break it into clear, actionable steps.
-    9. Ignore any content related to appendix or index. Only generate messages on the main content of the material.
-    10. DO NOT EXCEED more than 5 messages in total.
+      1. Each text message must be around 4-5 sentences under 1000 characters total.
+      2. Make each text message focus on a single concept, topic, idea, or quote from the content.
+      3. Write in a text message style while keeping the information accurate.
+      4. Ensure each text message is self-contained and easily understood.
+      5. Use simple language and explanatory analogies where helpful.
+      6. Exclude any unnecessary information that may be present in the content. This includes information about the author, references, any small talk, introductory content etc. that doesn't have meaningful informational value to the reader.
+      7. Make the information memorable and easy to understand.
+      8. If the body of text is instructional, break it into clear, actionable steps.
+      9. Ignore any content related to appendix or index. Only generate messages on the main content of the material.
+      10. DO NOT EXCEED more than 5 messages in total.
+    
+    Output format should be a series of text messages. Do not include a message that only introduces the topic, remember each text message should have some informational value.
   
-  Output format should be a series of text messages. Do not include a message that only introduces the topic, remember each text message should have some informational value.
-
-  Informational value can be determined based on the content. If its a blogpost or interview, capture the main essence, teachings and quotes. If its an academic paper, capture the main technique and results. If its a news article, capture the main events. and so on.
-  
-  For example, if given a technical article about photosynthesis, good text messages would be:
-   - "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves."
-   - "💧 Water plays a huge role in photosynthesis! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food!"
-  `;
+    Informational value can be determined based on the content. If its a blogpost or interview, capture the main essence, teachings and quotes. If its an academic paper, capture the main technique and results. If its a news article, capture the main events. and so on.
+    
+    For example, if given a technical article about photosynthesis, good text messages would be:
+     - "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves."
+     - "💧 Water plays a huge role in photosynthesis! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food!"
+    `;
 
   try {
     // Split text into smaller segments if it's too long
@@ -247,7 +317,6 @@ export async function parsePdf(file: Buffer) {
     });
 
     const cleanedText = cleanText(data.text);
-    console.log("Cleaned text:", cleanedText);
     const chunks = await splitIntoChunks(cleanedText);
     return chunks;
   } catch (error) {
@@ -283,19 +352,26 @@ export async function handleSubmission(formData: FormData) {
 
     let allChunks: string[] = [];
 
-    // Check if user can submit
     const canSubmit = await checkUserCanSubmit(supabase, user.id);
-
     if (!canSubmit) {
       throw new Error(
         `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨`
       );
     }
 
+    // Get user's timezone
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("timezone")
+      .eq("id", user.id)
+      .single();
+
+    if (userError) throw userError;
+
     // Generate a submission ID
     const submission_id = randomUUID();
 
-    // Upload PDF if provided
+    // Handle file uploads
     if (files.length > 0) {
       const folderPath = `${user.id}/${submission_id}`;
 
@@ -330,7 +406,30 @@ export async function handleSubmission(formData: FormData) {
       }
     }
 
-    // Create submission record
+    // Process URL if provided
+    if (url?.trim()) {
+      const urlChunks = await scrapeUrl(url);
+      allChunks = [...allChunks, ...urlChunks];
+    }
+
+    // Process raw text if provided
+    if (raw_text) {
+      const textChunks = await splitIntoChunks(cleanText(raw_text));
+      allChunks = [...allChunks, ...textChunks];
+    }
+
+    if (allChunks.length === 0) {
+      throw new Error("No content was extracted from the provided source");
+    }
+
+    // Generate start time based on submission ID
+    const startTime = generateStartTime(
+      submission_id,
+      userData.timezone,
+      cadence
+    );
+
+    // First create the submission record
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .insert({
@@ -340,37 +439,63 @@ export async function handleSubmission(formData: FormData) {
         uploaded_files: files.map((file) => file.name),
         cadence,
         repeat,
+        start_time: startTime.toISOString(),
+        timezone: userData.timezone,
+        last_sent_time: null,
       })
       .select()
       .single();
 
     if (submissionError) throw submissionError;
 
-    // Process URL if provided
-    if (url?.trim()) {
-      const urlChunks = await scrapeUrl(url);
-      allChunks = [...allChunks, ...urlChunks];
+    // Then create all messages
+    const messageIds: string[] = [];
+
+    for (const chunk of allChunks) {
+      const message_id = randomUUID();
+      messageIds.push(message_id);
+
+      const { error: messageError } = await supabase.from("messages").insert({
+        message_id: message_id,
+        submission_id: submission_id,
+        message_text: chunk,
+        timezone: userData.timezone,
+      });
+
+      if (messageError) throw messageError;
     }
 
-    if (raw_text) {
-      const textChunks = await splitIntoChunks(cleanText(raw_text));
-      allChunks = [...allChunks, ...textChunks];
+    // Update next_message_to_send for each message
+    for (let i = 0; i < messageIds.length; i++) {
+      const { error: updateError } = await supabase
+        .from("messages")
+        .update({
+          next_message_to_send: messageIds[(i + 1) % messageIds.length], // Circular reference for last message
+        })
+        .eq("message_id", messageIds[i]);
+
+      if (updateError) throw updateError;
     }
 
-    // Insert all chunks into database
-    if (allChunks.length > 0) {
-      const { error: cadenceError } = await supabase.from("cadences").insert(
-        allChunks.map((chunk) => ({
-          submission_id: submission.submission_id,
-          message_text: chunk,
-        }))
-      );
-      if (cadenceError) throw cadenceError;
-    }
+    // Finally, update the submission with the first message to send
+    const { error: updateSubmissionError } = await supabase
+      .from("submissions")
+      .update({
+        message_to_send: messageIds[0],
+        first_message_id: messageIds[0],
+      })
+      .eq("submission_id", submission_id);
+
+    if (updateSubmissionError) throw updateSubmissionError;
+
+    await processMessages(supabase, {
+      submissionId: submission_id,
+      skipTimeCheck: true, // Skip time-based checks for immediate send
+    });
 
     return {
       success: true,
-      submission_id: submission.submission_id,
+      submission_id: submission_id,
       chunks_count: allChunks.length,
     };
   } catch (error) {
