@@ -73,6 +73,7 @@ export async function processMessages(
             `);
 
       if (error) throw error;
+      console.log("all submissions: ", submissions);
       submissions = data || [];
     }
 
