@@ -12,6 +12,7 @@ import { traceable } from "langsmith/traceable";
 import { wrapOpenAI } from "langsmith/wrappers";
 import { z } from "zod";
 import { processMessages } from "@/utils/messages";
+import { YoutubeTranscript } from "youtube-transcript";
 
 const openai = wrapOpenAI(
   new OpenAI({
@@ -216,6 +217,39 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
   }
 });
 
+async function processYouTubeUrl(url: string): Promise<string[]> {
+  try {
+    // Extract video ID from URL
+    const videoId = url.match(
+      /(?:youtu\.be\/|youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
+    )?.[1];
+
+    if (!videoId) {
+      throw new Error("Invalid YouTube URL");
+    }
+
+    // Get transcript
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    const fullText = getTranscriptText(transcript);
+
+    // Process through GPT like other content
+    const chunks = await splitIntoChunks(cleanText(fullText));
+    return chunks;
+  } catch (error) {
+    console.error("Error processing YouTube URL:", error);
+    throw new Error("Failed to process YouTube video transcript");
+  }
+}
+
+function getTranscriptText(transcript: any[]) {
+  return transcript
+    .map((entry) => entry.text)
+    .join(" ")
+    .replace(/&amp;#39;/g, "'")
+    .replace(/\n/g, " ")
+    .trim();
+}
+
 export async function scrapeUrl(url: string) {
   try {
     const response = await fetch(url);
@@ -339,6 +373,7 @@ export async function getUser() {
 export async function handleSubmission(formData: FormData) {
   const supabase = await createClient();
   const url = formData.get("url") as string | null;
+  const youtube_url = formData.get("youtube_url") as string | null;
   const raw_text = formData.get("raw_text") as string | null;
   const files = formData.getAll("files") as File[];
   const cadence = formData.get("cadence") as string;
@@ -406,6 +441,12 @@ export async function handleSubmission(formData: FormData) {
       }
     }
 
+    // Process YouTube URL if provided
+    if (youtube_url?.trim()) {
+      const youtubeChunks = await processYouTubeUrl(youtube_url);
+      allChunks = [...allChunks, ...youtubeChunks];
+    }
+
     // Process URL if provided
     if (url?.trim()) {
       const urlChunks = await scrapeUrl(url);
@@ -435,7 +476,7 @@ export async function handleSubmission(formData: FormData) {
       .insert({
         submission_id: submission_id,
         user_id: user.id,
-        text_field: url?.trim() || raw_text || null,
+        text_field: youtube_url?.trim() || url?.trim() || raw_text || null,
         uploaded_files: files.map((file) => file.name),
         cadence,
         repeat,
