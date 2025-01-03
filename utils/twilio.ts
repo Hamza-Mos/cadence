@@ -16,8 +16,9 @@ function getTwilioClient() {
 export async function sendTextMessage(to: string, message: string) {
   try {
     const client = getTwilioClient();
+    const formattedMessage = `${message}\n\n- Sent by Cadence`;
     const result = await client.messages.create({
-      body: message,
+      body: formattedMessage,
       to,
       from: process.env.TWILIO_PHONE_NUMBER!,
     });
