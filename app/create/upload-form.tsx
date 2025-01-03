@@ -82,6 +82,10 @@ const FormSchema = z
     }
   );
 
+function isYouTubeUrl(url: string) {
+  const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
+  return youtubeRegex.test(url);
+}
 function isValidURL(url: string) {
   try {
     new URL(url);
@@ -120,8 +124,11 @@ export default function UploadForm({
 
       const formData = new FormData();
       const textContent = data.text?.trim() || "";
+
       if (textContent) {
-        if (isValidURL(textContent)) {
+        if (isYouTubeUrl(textContent)) {
+          formData.append("youtube_url", textContent);
+        } else if (isValidURL(textContent)) {
           formData.append("url", textContent);
         } else {
           formData.append("raw_text", textContent);
@@ -183,7 +190,7 @@ export default function UploadForm({
                   <Input type="text" {...field} />
                 </FormControl>
                 <FormDescription>
-                  Paste any raw text or a URL here.
+                  Paste any raw text, article/blog URL, or a YouTube URL here.
                 </FormDescription>
                 <FormMessage />
               </FormItem>
