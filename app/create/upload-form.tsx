@@ -32,23 +32,40 @@ import { redirect } from "next/navigation";
 
 const FIVE_MB = 5 * 1024 * 1024;
 
+// ----------------------
+// Zod Schema Definition
+// ----------------------
 const FormSchema = z
   .object({
     text: z.string().optional(),
-    files: z.array(z.instanceof(File)).optional().default([]),
+    files: z
+      .array(z.instanceof(File))
+      .optional()
+      .default([])
+      // You can leave these type/size checks if you still want a final guard on submit.
+      .refine(
+        (files) => {
+          if (!files?.length) return true;
+          return files.every((file) => file.type === "application/pdf");
+        },
+        {
+          message: "Only PDF files are allowed",
+          path: ["files"],
+        }
+      ),
     cadence: z.string(),
     repeat: z.string(),
   })
   .refine(
     (data) => {
-      // Check if at least one of text or files is provided
+      // Must provide *some* text or a file
       const hasText = !!data.text?.trim();
       const hasFiles = Array.isArray(data.files) && data.files.length > 0;
       return hasText || hasFiles;
     },
     {
       message: "Please provide either a URL/text or upload files",
-      path: ["text"], // This will show the error under the text field
+      path: ["text"],
     }
   )
   .refine(
@@ -83,10 +100,14 @@ const FormSchema = z
     }
   );
 
+// ----------------------
+// Helper Functions
+// ----------------------
 function isYouTubeUrl(url: string) {
   const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/.+$/;
   return youtubeRegex.test(url);
 }
+
 function isValidURL(url: string) {
   try {
     new URL(url);
@@ -96,11 +117,17 @@ function isValidURL(url: string) {
   }
 }
 
+// ----------------------
+// Component Props
+// ----------------------
 interface UploadFormProps {
   initialUserName: string;
   isSubscribed: boolean;
 }
 
+// ----------------------
+// Main Component
+// ----------------------
 export default function UploadForm({
   initialUserName,
   isSubscribed,
@@ -108,6 +135,7 @@ export default function UploadForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // React Hook Form initialization
   const form = useForm<z.infer<typeof FormSchema>>({
     resolver: zodResolver(FormSchema),
     defaultValues: {
@@ -118,6 +146,9 @@ export default function UploadForm({
     },
   });
 
+  // ----------------------
+  // Submit Handler
+  // ----------------------
   async function onSubmit(data: z.infer<typeof FormSchema>) {
     try {
       setIsSubmitting(true);
@@ -126,6 +157,7 @@ export default function UploadForm({
       const formData = new FormData();
       const textContent = data.text?.trim() || "";
 
+      // Distinguish text vs. URL vs. YouTube
       if (textContent) {
         if (isYouTubeUrl(textContent)) {
           formData.append("youtube_url", textContent);
@@ -136,10 +168,12 @@ export default function UploadForm({
         }
       }
 
+      // Attach files
       for (const file of data.files) {
         formData.append("files", file);
       }
 
+      // Additional fields
       formData.append("cadence", data.cadence);
       formData.append("repeat", data.repeat);
 
@@ -161,6 +195,9 @@ export default function UploadForm({
     }
   }
 
+  // ----------------------
+  // Greeting
+  // ----------------------
   const hours = new Date().getHours();
   let greeting = `Good morning, ${initialUserName.split(" ")[0]}! ☀️`;
   if (hours >= 12 && hours < 18) {
@@ -169,6 +206,9 @@ export default function UploadForm({
     greeting = `Good evening, ${initialUserName.split(" ")[0]}! 🌙`;
   }
 
+  // ----------------------
+  // Render
+  // ----------------------
   return (
     <div className="flex-1 w-full max-w-[520px] flex flex-col gap-12">
       <div className="w-full flex flex-row text-center justify-around font-bold text-4xl">
@@ -180,12 +220,16 @@ export default function UploadForm({
           texts at an interval of your choice.
         </p>
       </div>
+
       <Form {...form}>
         <form
           onSubmit={form.handleSubmit(onSubmit)}
           className="w-full space-y-6"
         >
+          {/* 1. Add Content */}
           <div>1. Add your content</div>
+
+          {/* Text Input Field */}
           <FormField
             control={form.control}
             name="text"
@@ -196,29 +240,61 @@ export default function UploadForm({
                   <Input type="text" {...field} />
                 </FormControl>
                 <FormDescription>
-                  Paste any raw text, article/blog URL, or a YouTube URL here.
+                  Paste any raw text, public article/blog URL (cannot be behind
+                  a paywall or login), or a YouTube video URL (must be a public
+                  video).
                 </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
-          <div className="w-full flex flex-row justify-around">{"AND/OR"}</div>
 
+          <div className="w-full flex flex-row justify-around">AND/OR</div>
+
+          {/* Files Drop Zone Field */}
           <FormField
             control={form.control}
             name="files"
             render={({ field, fieldState }) => {
+              // Handle valid file drops
               const onDrop = useCallback(
                 (acceptedFiles: File[]) => {
+                  const validFiles = acceptedFiles.filter(
+                    (file) =>
+                      file.type === "application/pdf" && file.size <= FIVE_MB
+                  );
+
                   const currentItems = form.getValues("files") || [];
-                  const newFiles = [...currentItems, ...acceptedFiles];
+                  const newFiles = [...currentItems, ...validFiles];
+
+                  // Max 3 files
+                  if (newFiles.length > 3) {
+                    form.setError("files", {
+                      type: "manual",
+                      message: "You can only upload up to 3 files",
+                    });
+                    return;
+                  }
+
+                  // No duplicates
+                  const fileNames = newFiles.map((f) => f.name);
+                  if (new Set(fileNames).size !== fileNames.length) {
+                    form.setError("files", {
+                      type: "manual",
+                      message: "Duplicate files are not allowed",
+                    });
+                    return;
+                  }
+
+                  // Set new files
                   form.setValue("files", newFiles);
-                  // Trigger validation immediately after setting new files
+                  // Trigger validation so Zod checks as well
                   form.trigger("files");
                 },
                 [form]
               );
 
+              // Remove file
               const onDelete = useCallback(
                 (filename: string) => {
                   const currentItems = form.getValues("files");
@@ -227,57 +303,87 @@ export default function UploadForm({
                       (item: File) => item.name !== filename
                     );
                     form.setValue("files", newFiles);
-                    // Trigger validation after deleting files
                     form.trigger("files");
                   }
                 },
                 [form]
               );
 
+              // Dropzone Config
               const { getRootProps, getInputProps, isDragActive } = useDropzone(
                 {
                   onDrop,
-                  // Add validation on drop
-                  onDropRejected: () => {
+                  maxSize: FIVE_MB,
+                  maxFiles: 3,
+                  accept: {
+                    "application/pdf": [".pdf"],
+                  },
+                  onDropRejected: (fileRejections) => {
+                    const errorMessages = fileRejections.map((rejection) => {
+                      const fileErrors = rejection.errors.map((error) => {
+                        switch (error.code) {
+                          case "file-too-large":
+                            return `${rejection.file.name} is larger than 5MB`;
+                          case "file-invalid-type":
+                            return `${rejection.file.name} is not a PDF file`;
+                          case "too-many-files":
+                            return "You tried to upload too many files at once";
+                          default:
+                            return error.message;
+                        }
+                      });
+                      return fileErrors.join(", ");
+                    });
+
                     form.setError("files", {
                       type: "manual",
-                      message: "One or more files were rejected",
+                      message: errorMessages.join("; "),
                     });
+                  },
+                  onDragEnter: () => {
+                    // Clear old errors to be ready for a new drop
+                    form.clearErrors("files");
                   },
                 }
               );
 
+              // Log the current error (helpful if the UI won't show it)
+              console.log("file error:", fieldState.error);
+
               return (
                 <FormItem>
-                  <div>
-                    <div {...getRootProps()}>
-                      <input {...getInputProps()} />
-                      <DropZoneUI isDragActive={isDragActive} />
-                    </div>
-                    <br />
-                    <div className="w-full flex flex-col justify-around gap-4">
-                      {field.value?.map((file: File) => (
-                        <FileTile
-                          key={file.name}
-                          filename={file.name}
-                          filesize={file.size}
-                          onDelete={onDelete}
-                        />
-                      ))}
-                    </div>
-                    {/* Add error message display */}
-                    {fieldState.error && (
-                      <FormMessage className="text-red-500 mt-2">
-                        {fieldState.error.message}
-                      </FormMessage>
-                    )}
+                  <div {...getRootProps()} className="border p-4">
+                    <input {...getInputProps()} />
+                    <DropZoneUI isDragActive={isDragActive} />
                   </div>
+
+                  <div className="w-full flex flex-col gap-4 mt-2">
+                    {field.value?.map((file: File) => (
+                      <FileTile
+                        key={file.name}
+                        filename={file.name}
+                        filesize={file.size}
+                        onDelete={onDelete}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Display immediate or Zod error */}
+                  {fieldState.error && (
+                    <FormMessage className="text-red-500 mt-2">
+                      {fieldState.error.message}
+                    </FormMessage>
+                  )}
                 </FormItem>
               );
             }}
           />
+
           <br />
+          {/* 2. Choose Settings */}
           <div>2. Choose Your Settings</div>
+
+          {/* Cadence */}
           <FormField
             control={form.control}
             name="cadence"
@@ -289,7 +395,7 @@ export default function UploadForm({
                 <FormControl>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <SelectTrigger>
-                      <SelectValue {...field} placeholder="Once Every..." />
+                      <SelectValue placeholder="Once Every..." />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -312,6 +418,8 @@ export default function UploadForm({
               </FormItem>
             )}
           />
+
+          {/* Repeat */}
           <FormField
             control={form.control}
             name="repeat"
@@ -324,7 +432,7 @@ export default function UploadForm({
                 <FormControl>
                   <Select onValueChange={field.onChange} value={field.value}>
                     <SelectTrigger>
-                      <SelectValue {...field} placeholder="Repeat..." />
+                      <SelectValue placeholder="Repeat..." />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectGroup>
@@ -344,11 +452,15 @@ export default function UploadForm({
               </FormItem>
             )}
           />
+
+          {/* Submit Button */}
           <div className="w-full flex flex-row justify-around">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? "Submitting..." : "Submit"}
             </Button>
           </div>
+
+          {/* Top-level Error */}
           {error && (
             <div className="w-full text-center text-red-500">{error}</div>
           )}
