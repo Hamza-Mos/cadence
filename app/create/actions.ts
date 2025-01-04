@@ -250,6 +250,23 @@ function getTranscriptText(transcript: any[]) {
     .trim();
 }
 
+async function isPublicUrl(url: string) {
+  try {
+    // A HEAD request is often enough to see if it's public (2xx).
+    // Alternatively, you can do a GET request if you need to inspect HTML content.
+    const response = await fetch(url, { method: "HEAD" });
+    if (!response.ok) {
+      // e.g. 403, 401, 404 => treat as restricted or nonexistent
+      console.log(`Non-200 status: ${response.status}`);
+      return false;
+    }
+    return true;
+  } catch (error) {
+    console.error("Public URL check failed:", error);
+    return false;
+  }
+}
+
 export async function scrapeUrl(url: string) {
   try {
     const response = await fetch(url);
@@ -443,12 +460,26 @@ export async function handleSubmission(formData: FormData) {
 
     // Process YouTube URL if provided
     if (youtube_url?.trim()) {
+      const publicCheck = await isPublicUrl(youtube_url.trim());
+      if (!publicCheck) {
+        throw new Error(
+          "The provided YouTube URL appears to be restricted or private."
+        );
+      }
+
       const youtubeChunks = await processYouTubeUrl(youtube_url);
       allChunks = [...allChunks, ...youtubeChunks];
     }
 
     // Process URL if provided
     if (url?.trim()) {
+      const publicCheck = await isPublicUrl(url.trim());
+      if (!publicCheck) {
+        throw new Error(
+          "The provided URL appears to be restricted or behind a paywall."
+        );
+      }
+
       const urlChunks = await scrapeUrl(url);
       allChunks = [...allChunks, ...urlChunks];
     }
