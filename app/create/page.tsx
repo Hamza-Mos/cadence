@@ -20,6 +20,7 @@ export default async function CreatePage() {
     .eq("id", user?.id);
 
   if (!data || data.length === 0 || error) {
+    console.error(`Error getting user data for user id ${user?.id}: `, error);
     throw new Error("Error getting user data");
   }
 

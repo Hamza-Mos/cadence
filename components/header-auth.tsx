@@ -25,6 +25,10 @@ export default async function AuthButton() {
   if (user) {
     resp = await supabase.from("users").select("*").eq("id", user?.id);
     if (!resp.data || resp.data.length === 0 || resp.error) {
+      console.error(
+        `Error getting user data for user id ${user?.id}: `,
+        resp.error
+      );
       throw new Error("Error getting user data");
     }
   }
