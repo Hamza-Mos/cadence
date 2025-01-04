@@ -28,6 +28,7 @@ import {
 import DropZoneUI from "@/components/dropzone";
 import FileTile from "@/components/filetile";
 import { handleSubmission } from "./actions";
+import { redirect } from "next/navigation";
 
 const FIVE_MB = 5 * 1024 * 1024;
 
@@ -142,11 +143,16 @@ export default function UploadForm({
       formData.append("cadence", data.cadence);
       formData.append("repeat", data.repeat);
 
-      const result = await handleSubmission(formData);
-      console.log("Processed content:", result);
-
-      // Handle successful submission
+      handleSubmission(formData);
       form.reset();
+
+      const response = await fetch("/api/submit", {
+        method: "GET",
+      });
+
+      if (response.status === 307 || response.redirected) {
+        window.location.href = response.headers.get("Location") || "/done";
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       console.error("Submission error:", err);
