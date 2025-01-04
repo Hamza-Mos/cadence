@@ -14,8 +14,9 @@ const defaultUrl = process.env.VERCEL_URL
 
 export const metadata = {
   metadataBase: new URL(defaultUrl),
-  title: "Cadence",
-  description: "Microlearning made easy!",
+  title: "Cadence: Microlearning made easy!",
+  description:
+    "Supercharge your microlearning with byte-sized texts using Cadence!",
 };
 
 export default function RootLayout({
