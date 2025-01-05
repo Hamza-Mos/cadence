@@ -13,6 +13,7 @@ import { wrapOpenAI } from "langsmith/wrappers";
 import { z } from "zod";
 import { processMessages } from "@/utils/messages";
 import { YoutubeTranscript } from "youtube-transcript";
+import { sendTextMessage } from "@/utils/twilio";
 
 const openai = wrapOpenAI(
   new OpenAI({
@@ -575,10 +576,37 @@ export async function handleSubmission(formData: FormData) {
     };
   } catch (error) {
     console.error("Error in handleSubmission:", error);
-    throw error instanceof Error
-      ? error
-      : new Error(
-          "Failed to process submission, please try again in a few minutes."
-        );
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    // Get the user's name and phone number from Supabase or somewhere in your user profile.
+    // For example, maybe you have these columns:
+    const { data: userProfile } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    const userName = userProfile?.first_name || "there";
+    const userPhone = `+${userProfile?.area_code}${userProfile?.phone_number}`;
+
+    // If userPhone is defined, send them a text explaining what happened
+    if (userPhone) {
+      const errorMsg =
+        typeof error === "object" && error !== null
+          ? (error as Error).message
+          : String(error);
+
+      await sendTextMessage(
+        userPhone,
+        `Hey ${userName}, there was an issue with your recent submission on Cadence.\n\n${errorMsg}`
+      );
+    }
+
+    // rethrow (or not) depending on whether you want the error to keep bubbling?
+    // throw error;
   }
 }
