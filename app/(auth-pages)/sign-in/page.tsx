@@ -53,7 +53,7 @@ export default function Login() {
           action={handleSendCode}
           className="flex flex-col gap-2 [&>input]:mb-3 mt-8"
         >
-          <Label>Phone Number</Label>
+          <Label>Phone Number *</Label>
           <PhoneInput />
           <SubmitButton pendingText="Sending code...">
             Send verification code
