@@ -19,12 +19,21 @@ export default function Hero() {
       <br />
       <div className="flex flex-col gap-2">
         <div className="text-2xl md:text-3xl font-bold text-center p-2">
+          Why Cadence?
+        </div>
+        <p className="w-full flex flex-row justify-start text-md mx-auto max-w-md">
+        Ever open your inbox to find a newsletter you’re excited to read or a blog post that has an appealing title, but then get swamped with everything else and forget about it?  <br />  <br /> You tell yourself you'll get back to it later, but weeks go by and it’s still sitting there, unopened in a tab in your browser. <br />  <br /> You’re not alone.  <br />  <br /> Long-form content can be tough to tackle—it takes time, focus, and energy. <br />  <br />  That’s exactly why we created Cadence.  <br />  <br /> Cadence breaks down knowledge into bite-sized, digestible pieces, making it easier to stay on top of the information that matters.
+        </p>
+      </div>
+      <br />
+      <div className="flex flex-col gap-2">
+        <div className="text-2xl md:text-3xl font-bold text-center p-2">
           How Cadence Works?
         </div>
         <p className="w-full flex flex-row justify-start text-md md:text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 1
         </p>
-        <p className="text-sm md:text-md mx-auto max-w-md">
+        <p className="text-md mx-auto max-w-md">
           Share what you want to learn! Upload PDFs, text, images, or URLs
           (video support coming soon).
         </p>
@@ -33,7 +42,7 @@ export default function Hero() {
         <p className="w-full flex flex-row justify-start text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 2
         </p>
-        <p className="text-sm md:text-md mx-auto max-w-md">
+        <p className="text-md mx-auto max-w-md">
           Choose how often you’d like to receive text messages and decide if
           you'd like the information to repeat for better retention.
         </p>
@@ -42,7 +51,7 @@ export default function Hero() {
         <p className="w-full flex flex-row justify-start text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 3
         </p>
-        <p className="text-sm md:text-md  mx-auto max-w-md">
+        <p className="text-md mx-auto max-w-md">
           Hit submit, and we’ll transform your content into bite-sized,
           digestible text messages tailored to your schedule.
         </p>
@@ -51,7 +60,7 @@ export default function Hero() {
         <p className="w-full flex flex-row justify-start text-lg mx-auto max-w-md font-bold">
           👉🏾 Step 4
         </p>
-        <p className="text-sm md:text-md mx-auto max-w-md">
+        <p className="text-md mx-auto max-w-md">
           Stay informed and retain knowledge with easy-to-read, perfectly timed
           messages sent straight to your phone.
         </p>
