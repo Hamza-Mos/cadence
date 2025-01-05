@@ -52,7 +52,7 @@ export default function RootLayout({
 
               <footer className="w-full flex items-center justify-between border-t mx-auto text-center text-xs gap-8 py-16">
                 <div className="w-full flex flex-row justify-start gap-4 md:gap-12 ml-4 md:ml-12">
-                  <p>© 2024 Cadance</p>{" "}
+                  <p>© 2025 Cadence</p>{" "}
                 </div>
                 <div className="w-full flex flex-col justify-around gap-4 mr-4 md:mr-12">
                   <div className="flex flex-col justify-between gap-2">
