@@ -237,7 +237,9 @@ async function processYouTubeUrl(url: string): Promise<string[]> {
     return chunks;
   } catch (error) {
     console.error("Error processing YouTube URL:", error);
-    throw new Error("Failed to process YouTube video transcript");
+    throw new Error(
+      "Failed to process YouTube video transcript because transcription is disabled on this video. Please try a different video that has transcription enabled."
+    );
   }
 }
 
