@@ -179,7 +179,7 @@ export default function UploadForm({
       formData.append("cadence", data.cadence);
       formData.append("repeat", data.repeat);
 
-      handleSubmission(formData);
+      await handleSubmission(formData);
       form.reset();
 
       const response = await fetch("/api/submit", {

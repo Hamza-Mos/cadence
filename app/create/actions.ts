@@ -218,7 +218,7 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
   }
 });
 
-async function processYouTubeUrl(url: string): Promise<string[]> {
+async function processYouTubeUrl(url: string): Promise<string> {
   try {
     // Extract video ID from URL
     const videoId = url.match(
@@ -233,9 +233,7 @@ async function processYouTubeUrl(url: string): Promise<string[]> {
     const transcript = await YoutubeTranscript.fetchTranscript(videoId);
     const fullText = getTranscriptText(transcript);
 
-    // Process through GPT like other content
-    const chunks = await splitIntoChunks(cleanText(fullText));
-    return chunks;
+    return fullText;
   } catch (error) {
     console.error("Error processing YouTube URL:", error);
     throw new Error(
@@ -271,64 +269,59 @@ async function isPublicUrl(url: string) {
 }
 
 export async function scrapeUrl(url: string) {
-  try {
-    const response = await fetch(url);
-    const html = await response.text();
-    const $ = cheerio.load(html);
 
-    // Remove unwanted elements
-    $("script").remove();
-    $("style").remove();
-    $("comment").remove();
-    $("iframe").remove();
-    $("nav").remove();
-    $("header").remove();
-    $("footer").remove();
-    $(".comments").remove();
-    $("#comments").remove();
-    $("img").remove();
-    $('[class*="advertisement"]').remove();
-    $('[id*="advertisement"]').remove();
-    $('[class*="sidebar"]').remove();
-    $('[id*="sidebar"]').remove();
-    $('[class*="footer"]').remove();
-    $('[id*="footer"]').remove();
+  const response = await fetch(url);
+  const html = await response.text();
+  const $ = cheerio.load(html);
 
-    // Some common selectors for articles
-    const contentSelectors = [
-      "article",
-      "main",
-      ".main-content",
-      "#main-content",
-      ".post-content",
-      ".article-content",
-      ".entry-content",
-      ".content",
-      '[role="main"]',
-      "#content",
-      "#mw-content-text",
-    ];
+  // Remove unwanted elements
+  $("script").remove();
+  $("style").remove();
+  $("comment").remove();
+  $("iframe").remove();
+  $("nav").remove();
+  $("header").remove();
+  $("footer").remove();    
+  $(".comments").remove();
+  $("#comments").remove();
+  $("img").remove();
+  $('[class*="advertisement"]').remove();
+  $('[id*="advertisement"]').remove();
+  $('[class*="sidebar"]').remove();
+  $('[id*="sidebar"]').remove();
+  $('[class*="footer"]').remove();
+  $('[id*="footer"]').remove();
 
-    let mainContent = "";
-    for (const selector of contentSelectors) {
-      const content = $(selector).text();
-      if (content && content.length > mainContent.length) {
-        mainContent = content;
-      }
+  // Some common selectors for articles
+  const contentSelectors = [
+    "article",
+    "main",
+    ".main-content",
+    "#main-content",
+    ".post-content",
+    ".article-content",
+    ".entry-content",
+    ".content",
+    '[role="main"]',
+    "#content",
+    "#mw-content-text",
+  ];
+
+  let mainContent = "";
+  for (const selector of contentSelectors) {
+    const content = $(selector).text();
+    if (content) {
+      mainContent += '\n' + content;
     }
-
-    // If no main content found, get body text
-    if (!mainContent) {
-      mainContent = $("body").text();
-    }
-
-    const cleanedText = cleanText(mainContent);
-    const chunks = await splitIntoChunks(cleanedText);
-    return chunks;
-  } catch (error) {
-    console.error("Error scraping URL:", error);
-    throw new Error("Failed to scrape URL");
   }
+
+  // If no main content found, throw an error and ask user to copy-paste the text instead
+  if (!mainContent) {
+    throw new Error("Sorry, we weren't able to find the content in the provided URL. Please try copy-pasting the content text instead.");
+  }
+
+  const cleanedText = cleanText(mainContent);
+  return cleanedText;
 }
 
 async function checkUserCanSubmit(
@@ -371,8 +364,8 @@ export async function parsePdf(file: Buffer) {
     });
 
     const cleanedText = cleanText(data.text);
-    const chunks = await splitIntoChunks(cleanedText);
-    return chunks;
+    
+    return cleanedText;
   } catch (error) {
     console.error("Error parsing PDF:", error);
     throw new Error("Failed to parse PDF");
@@ -390,109 +383,27 @@ export async function getUser() {
   }
 }
 
-export async function handleSubmission(formData: FormData) {
-  const supabase = await createClient();
-  const url = formData.get("url") as string | null;
-  const youtube_url = formData.get("youtube_url") as string | null;
-  const raw_text = formData.get("raw_text") as string | null;
-  const files = formData.getAll("files") as File[];
-  const cadence = formData.get("cadence") as string;
-  const repeat = formData.get("repeat") as string;
-
+export async function handleSaveChunks(
+  allChunkPromises: Promise<string[]>[], 
+  submission_id: string,
+  cadence: string,
+  repeat: string,
+  userData: any,
+  supabase: SupabaseClient<any, "public", any>,
+  user: any,
+  files: File[],
+  url?: string,
+  youtube_url?: string,
+  raw_text?: string,
+) {
   try {
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) throw new Error("Not authenticated");
 
     let allChunks: string[] = [];
-
-    const canSubmit = await checkUserCanSubmit(supabase, user.id);
-    if (!canSubmit) {
-      throw new Error(
-        `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨`
-      );
+    for (const chunkPromise of allChunkPromises) {
+      const chunk = await chunkPromise;
+      allChunks = [...allChunks, ...chunk];
     }
-
-    // Get user's timezone
-    const { data: userData, error: userError } = await supabase
-      .from("users")
-      .select("timezone")
-      .eq("id", user.id)
-      .single();
-
-    if (userError) throw userError;
-
-    // Generate a submission ID
-    const submission_id = randomUUID();
-
-    // Handle file uploads
-    if (files.length > 0) {
-      const folderPath = `${user.id}/${submission_id}`;
-
-      // Upload each file and get signed URLs
-      for (const file of files) {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const filePath = `${folderPath}/${file.name}`;
-
-        // Upload the file
-        const { data: uploadData, error: uploadError } = await supabase.storage
-          .from("attachments")
-          .upload(filePath, buffer, {
-            contentType: file.type,
-            cacheControl: "3600",
-          });
-
-        if (uploadError) throw uploadError;
-
-        // Get a signed URL for the uploaded file
-        const { data: signedUrlData, error: signedUrlError } =
-          await supabase.storage
-            .from("attachments")
-            .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
-
-        if (signedUrlError || !signedUrlData?.signedUrl) throw signedUrlError;
-
-        // Use the signed URL to access the file
-        const fileResponse = await fetch(signedUrlData.signedUrl);
-        const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
-        const pdfChunks = await parsePdf(fileBuffer);
-        allChunks = [...allChunks, ...pdfChunks];
-      }
-    }
-
-    // Process YouTube URL if provided
-    if (youtube_url?.trim()) {
-      const publicCheck = await isPublicUrl(youtube_url.trim());
-      if (!publicCheck) {
-        throw new Error(
-          "The provided YouTube URL appears to be restricted or private."
-        );
-      }
-
-      const youtubeChunks = await processYouTubeUrl(youtube_url);
-      allChunks = [...allChunks, ...youtubeChunks];
-    }
-
-    // Process URL if provided
-    if (url?.trim()) {
-      const publicCheck = await isPublicUrl(url.trim());
-      if (!publicCheck) {
-        throw new Error(
-          "The provided URL appears to be restricted or behind a paywall."
-        );
-      }
-
-      const urlChunks = await scrapeUrl(url);
-      allChunks = [...allChunks, ...urlChunks];
-    }
-
-    // Process raw text if provided
-    if (raw_text) {
-      const textChunks = await splitIntoChunks(cleanText(raw_text));
-      allChunks = [...allChunks, ...textChunks];
-    }
-
+    
     if (allChunks.length === 0) {
       throw new Error("No content was extracted from the provided source");
     }
@@ -605,8 +516,131 @@ export async function handleSubmission(formData: FormData) {
         `Hey ${userName}, there was an issue with your recent submission on Cadence.\n\n${errorMsg}`
       );
     }
+  }
+}
 
-    // rethrow (or not) depending on whether you want the error to keep bubbling?
-    // throw error;
+export async function handleSubmission(formData: FormData) {
+  const supabase = await createClient();
+  const url = formData.get("url") as string | undefined;
+  const youtube_url = formData.get("youtube_url") as string | undefined;
+  const raw_text = formData.get("raw_text") as string | undefined;
+  const files = formData.getAll("files") as File[];
+  const cadence = formData.get("cadence") as string;
+  const repeat = formData.get("repeat") as string;
+
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    let allChunkPromises: Promise<string[]>[] = [];
+
+    const canSubmit = await checkUserCanSubmit(supabase, user.id);
+    if (!canSubmit) {
+      throw new Error(
+        `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨`
+      );
+    }
+
+    // Get user's timezone
+    const { data: userData, error: userError } = await supabase
+      .from("users")
+      .select("timezone")
+      .eq("id", user.id)
+      .single();
+
+    if (userError) throw userError;
+
+    // Generate a submission ID
+    const submission_id = randomUUID();
+
+    // Handle file uploads
+    if (files.length > 0) {
+      const folderPath = `${user.id}/${submission_id}`;
+
+      // Upload each file and get signed URLs
+      for (const file of files) {
+        const buffer = Buffer.from(await file.arrayBuffer());
+        const filePath = `${folderPath}/${file.name}`;
+
+        // Upload the file
+        const { data: uploadData, error: uploadError } = await supabase.storage
+          .from("attachments")
+          .upload(filePath, buffer, {
+            contentType: file.type,
+            cacheControl: "3600",
+          });
+
+        if (uploadError) throw uploadError;
+
+        // Get a signed URL for the uploaded file
+        const { data: signedUrlData, error: signedUrlError } =
+          await supabase.storage
+            .from("attachments")
+            .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
+
+        if (signedUrlError || !signedUrlData?.signedUrl) throw signedUrlError;
+
+        // Use the signed URL to access the file
+        const fileResponse = await fetch(signedUrlData.signedUrl);
+        const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
+        const cleanedText = await parsePdf(fileBuffer);
+        const pdfChunks = splitIntoChunks(cleanedText);
+        allChunkPromises = [...allChunkPromises, pdfChunks];
+      }
+    }
+
+    // Process YouTube URL if provided
+    if (youtube_url?.trim()) {
+      const publicCheck = await isPublicUrl(youtube_url.trim());
+      if (!publicCheck) {
+        throw new Error(
+          "The provided YouTube URL appears to be restricted or private."
+        );
+      }
+
+      const youtubeTranscript = await processYouTubeUrl(youtube_url);
+      const youtubeChunks = splitIntoChunks(cleanText(youtubeTranscript));
+      allChunkPromises = [...allChunkPromises, youtubeChunks];
+    }
+
+    // Process URL if provided
+    if (url?.trim()) {
+      const publicCheck = await isPublicUrl(url.trim());
+      if (!publicCheck) {
+        throw new Error(
+          "The provided URL appears to be restricted or behind a paywall."
+        );
+      }
+      console.log("Scraping URL:", url);
+      const cleanedText = await scrapeUrl(url);
+      const urlChunks = splitIntoChunks(cleanedText);
+      allChunkPromises = [...allChunkPromises, urlChunks];
+    }
+
+    // Process raw text if provided
+    if (raw_text) {
+      const textChunks = splitIntoChunks(cleanText(raw_text));
+      allChunkPromises = [...allChunkPromises, textChunks];
+    }
+
+    handleSaveChunks(
+      allChunkPromises,
+      submission_id,
+      cadence,
+      repeat,
+      userData,
+      supabase,
+      user,
+      files,
+      url,
+      youtube_url,
+      raw_text
+    );
+
+  } catch (error) {
+    console.error("Error in processing submission:", error);
+    throw error;
   }
 }
