@@ -29,6 +29,8 @@ import DropZoneUI from "@/components/dropzone";
 import FileTile from "@/components/filetile";
 import { handleSubmission } from "./actions";
 import { redirect } from "next/navigation";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { InformationCircleIcon } from "@heroicons/react/24/outline";
 
 const FIVE_MB = 5 * 1024 * 1024;
 
@@ -240,9 +242,14 @@ export default function UploadForm({
                   <Input type="text" {...field} />
                 </FormControl>
                 <FormDescription>
-                  Paste any raw text, public article/blog URL (cannot be behind
-                  a paywall or login), or a YouTube video URL (must be a public
-                  video).
+                  {"Paste any text, public URL (blogpost, article, etc.), or YouTube video URL."}&nbsp;<TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger><div className="h-full flex flex-col justify-around items-center"><InformationCircleIcon className="w-4 h-4"/></div></TooltipTrigger>
+                      <TooltipContent>
+                        <p>Public url is a url that is NOT behind a paywall or login.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 </FormDescription>
                 <FormMessage />
               </FormItem>
