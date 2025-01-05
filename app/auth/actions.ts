@@ -21,8 +21,8 @@ export async function signUpWithPhone(formData: FormData) {
     // Check for existing user
     const { data: existingUser, error: lookupError } = await supabase
       .from("users")
-      .select("phone")
-      .eq("phone", phoneNumber)
+      .select("phone_number")
+      .eq("phone_number", phoneNumber)
       .single();
 
     if (existingUser) {
@@ -227,6 +227,20 @@ export async function signInWithPhone(formData: FormData) {
   const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
 
   try {
+    // Check if user does not exist
+    const { data: existingUser, error: lookupError } = await supabase
+      .from("users")
+      .select("phone_number")
+      .eq("phone_number", phoneNumber)
+      .single();
+
+    if (!existingUser) {
+      return {
+        error:
+          "An account with this phone number does not exist. Please sign up to create a new account instead.",
+      };
+    }
+
     const { data, error } = await supabase.auth.signInWithOtp({
       phone: fullPhone,
     });
