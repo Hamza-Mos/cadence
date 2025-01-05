@@ -8,7 +8,7 @@ export default function Hero() {
       </p>
       <p className="text-md mx-auto text-center">
         Trouble reading long form content? <br />
-        No problem! Learn anything in 4 easy steps.
+        No problem! Absorb any information in 4 easy steps.
       </p>
       <Link
         href="/create"
