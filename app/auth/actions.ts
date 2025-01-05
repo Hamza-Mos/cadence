@@ -15,8 +15,6 @@ export async function signUpWithPhone(formData: FormData) {
   const lastName = formData.get("lastName") as string;
   const timezone = formData.get("timezone") as string; // Get timezone from form
   const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
-  console.log(formData);
-  console.log(fullPhone);
 
   try {
     // Check for existing user
