@@ -20,9 +20,10 @@ export default function FileTile({
         <div>
           <p className="text-sm">{filename}</p>
         </div>
+        {filesize && 
         <span className="text-xs text-gray-600 bg-gray-200 px-2 py-1 rounded-full">
-          {filesize && Math.round((filesize / (1024 * 1024)) * 100) / 100} MB
-        </span>
+          {Math.round((filesize / (1024 * 1024)) * 100) / 100} MB
+        </span>}
       </div>
       <div className="flex items-center space-x-2">
         {onDelete && (
