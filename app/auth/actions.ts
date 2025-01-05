@@ -5,17 +5,16 @@ import { createClient } from "@/utils/supabase/server";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Stripe from "stripe";
+import { createServiceClient } from "@/utils/supabase/service-client";
 
 export async function signUpWithPhone(formData: FormData) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const areaCode = formData.get("countryCode") as string;
   const phoneNumber = formData.get("phoneNumber") as string;
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
   const timezone = formData.get("timezone") as string; // Get timezone from form
   const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
-  console.log(formData);
-  console.log(fullPhone);
 
   try {
     // Check for existing user
@@ -221,7 +220,7 @@ export async function verifyPhoneChange(formData: FormData) {
 }
 
 export async function signInWithPhone(formData: FormData) {
-  const supabase = await createClient();
+  const supabase = createServiceClient();
   const areaCode = formData.get("countryCode") as string;
   const phoneNumber = formData.get("phoneNumber") as string;
   const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
