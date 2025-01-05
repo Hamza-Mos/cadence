@@ -409,10 +409,10 @@ export default function UploadForm({
                         <SelectLabel>Cadence</SelectLabel>
                         <SelectItem value="receive-daily">day</SelectItem>
                         <SelectItem value="receive-12" disabled={!isSubscribed}>
-                          12 hours {!isSubscribed && "(Pro ✨)"}
+                          12 hours
                         </SelectItem>
                         <SelectItem value="receive-6" disabled={!isSubscribed}>
-                          6 hours {!isSubscribed && "(Pro ✨)"}
+                          6 hours
                         </SelectItem>
                         <SelectItem value="receive-1" disabled={!isSubscribed}>
                           1 hour {!isSubscribed && "(Pro ✨)"}

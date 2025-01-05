@@ -85,8 +85,8 @@ export default function Hero() {
                   $0<span className="text-lg">/month</span>
                 </p>
                 <ul className="text-left mb-6">
-                  <li className="mb-2">✔ Up to 7 submissions</li>
-                  <li className="mb-2">✔ One text per day</li>
+                  <li className="mb-2">✔ Up to 5 submissions</li>
+                  <li className="mb-2">✔ One text per day, 12 hours, or 6 hours</li>
                   <li className="mb-2">✔ Priority Support</li>
                 </ul>
               </div>
@@ -103,7 +103,7 @@ export default function Hero() {
                 <ul className="text-left mb-6">
                   <li className="mb-2">✔ Unlimited submissions</li>
                   <li className="mb-2">
-                    ✔ One text every day, 12 hours, 6 hours or 1 hour
+                    ✔ Additionally, one text every 1 hour option
                   </li>
                   <li className="mb-2">
                     ✔ Repeat information over time for better retention

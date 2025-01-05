@@ -21,7 +21,7 @@ const openai = wrapOpenAI(
   })
 );
 
-const MAX_FREE_SUBMISSIONS = 7;
+const MAX_FREE_SUBMISSIONS = 5;
 
 const TextMessages = z.object({
   text_messages: z.array(z.string()),
@@ -113,6 +113,10 @@ const cleanText = (text: string): string => {
     .trim();
 };
 const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
+
+  const gptModel = text.length > 120_000 ? "gpt-4o-mini" : "gpt-4o";
+  console.log(`Using model: ${gptModel} to split text into chunks`);
+
   const systemPrompt = `You are an expert at breaking down and explaining complex information. Break down the content given by a user seeking to understand the content into engaing text messages that will be delivered back to the user in timely intervals. Some rules to follow are:
       1. Each text message must be around 4-5 sentences under 1000 characters total.
       2. Make each text message focus on a single concept, topic, idea, or quote from the content.
@@ -147,7 +151,7 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
     // Process each segment
     for (const segment of textSegments) {
       const completion = await openai.beta.chat.completions.parse({
-        model: "gpt-4o",
+        model: gptModel,
         messages: [
           {
             role: "system",
@@ -539,7 +543,7 @@ export async function handleSubmission(formData: FormData) {
     const canSubmit = await checkUserCanSubmit(supabase, user.id);
     if (!canSubmit) {
       throw new Error(
-        `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨`
+        `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨.`
       );
     }
 
