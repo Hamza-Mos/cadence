@@ -8,12 +8,14 @@ import Stripe from "stripe";
 
 export async function signUpWithPhone(formData: FormData) {
   const supabase = await createClient();
-  const areaCode = formData.get("areaCode") as string;
+  const areaCode = formData.get("countryCode") as string;
   const phoneNumber = formData.get("phoneNumber") as string;
   const firstName = formData.get("firstName") as string;
   const lastName = formData.get("lastName") as string;
   const timezone = formData.get("timezone") as string; // Get timezone from form
   const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
+  console.log(formData);
+  console.log(fullPhone);
 
   try {
     // Check for existing user
@@ -133,7 +135,7 @@ export async function verifySignUpOtp(formData: FormData) {
 
 export async function requestPhoneChange(formData: FormData) {
   const supabase = await createClient();
-  const areaCode = formData.get("areaCode") as string;
+  const areaCode = formData.get("countryCode") as string;
   const phoneNumber = formData.get("phoneNumber") as string;
   const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
 
@@ -166,7 +168,7 @@ export async function verifyPhoneChange(formData: FormData) {
   const phone = formData.get("phone") as string;
   const token = formData.get("token") as string;
   const timezone = formData.get("timezone") as string;
-  const areaCode = formData.get("areaCode") as string; // Add this
+  const areaCode = formData.get("countryCode") as string; // Add this
   const phoneNumber = formData.get("phoneNumber") as string; // Add this
 
   try {
@@ -220,7 +222,7 @@ export async function verifyPhoneChange(formData: FormData) {
 
 export async function signInWithPhone(formData: FormData) {
   const supabase = await createClient();
-  const areaCode = formData.get("areaCode") as string;
+  const areaCode = formData.get("countryCode") as string;
   const phoneNumber = formData.get("phoneNumber") as string;
   const fullPhone = `+${areaCode}${phoneNumber.replace(/^0+/, "")}`;
 
