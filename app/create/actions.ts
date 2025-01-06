@@ -400,25 +400,40 @@ export async function handleSaveChunks(
   youtube_url?: string,
   raw_text?: string
 ) {
+  const startTime = Date.now();
+  let stepStartTime = startTime;
+
   try {
+    // Process chunks
+    console.log("Starting chunk processing...");
     let allChunks: string[] = [];
     for (const chunkPromise of allChunkPromises) {
       const chunk = await chunkPromise;
       allChunks = [...allChunks, ...chunk];
     }
+    console.log(
+      `Chunk processing completed in ${Date.now() - stepStartTime}ms`
+    );
 
     if (allChunks.length === 0) {
       throw new Error("No content was extracted from the provided source");
     }
 
-    // Generate start time based on submission ID
-    const startTime = generateStartTime(
+    // Generate start time
+    stepStartTime = Date.now();
+    console.log("Generating start time...");
+    const startDateTime = generateStartTime(
       submission_id,
       userData.timezone,
       cadence
     );
+    console.log(
+      `Start time generation completed in ${Date.now() - stepStartTime}ms`
+    );
 
-    // First create the submission record
+    // Create submission record
+    stepStartTime = Date.now();
+    console.log("Creating submission record...");
     const { data: submission, error: submissionError } = await supabase
       .from("submissions")
       .insert({
@@ -428,7 +443,7 @@ export async function handleSaveChunks(
         uploaded_files: files.map((file) => file.name),
         cadence,
         repeat,
-        start_time: startTime.toISOString(),
+        start_time: startDateTime.toISOString(),
         timezone: userData.timezone,
         last_sent_time: null,
       })
@@ -436,8 +451,13 @@ export async function handleSaveChunks(
       .single();
 
     if (submissionError) throw submissionError;
+    console.log(
+      `Submission record creation completed in ${Date.now() - stepStartTime}ms`
+    );
 
-    // Then create all messages
+    // Create messages
+    stepStartTime = Date.now();
+    console.log("Creating messages...");
     const messageIds: string[] = [];
 
     for (const chunk of allChunks) {
@@ -453,20 +473,30 @@ export async function handleSaveChunks(
 
       if (messageError) throw messageError;
     }
+    console.log(
+      `Message creation completed in ${Date.now() - stepStartTime}ms`
+    );
 
-    // Update next_message_to_send for each message
+    // Update next_message_to_send
+    stepStartTime = Date.now();
+    console.log("Updating message links...");
     for (let i = 0; i < messageIds.length; i++) {
       const { error: updateError } = await supabase
         .from("messages")
         .update({
-          next_message_to_send: messageIds[(i + 1) % messageIds.length], // Circular reference for last message
+          next_message_to_send: messageIds[(i + 1) % messageIds.length],
         })
         .eq("message_id", messageIds[i]);
 
       if (updateError) throw updateError;
     }
+    console.log(
+      `Message link updates completed in ${Date.now() - stepStartTime}ms`
+    );
 
-    // Finally, update the submission with the first message to send
+    // Update submission
+    stepStartTime = Date.now();
+    console.log("Updating submission with first message...");
     const { error: updateSubmissionError } = await supabase
       .from("submissions")
       .update({
@@ -476,20 +506,34 @@ export async function handleSaveChunks(
       .eq("submission_id", submission_id);
 
     if (updateSubmissionError) throw updateSubmissionError;
+    console.log(
+      `Submission update completed in ${Date.now() - stepStartTime}ms`
+    );
 
+    // Process messages
+    stepStartTime = Date.now();
+    console.log("Processing messages...");
     await processMessages(supabase, {
       submissionId: submission_id,
-      skipTimeCheck: true, // Skip time-based checks for immediate send
+      skipTimeCheck: true,
       isFirstMessage: true,
     });
+    console.log(
+      `Message processing completed in ${Date.now() - stepStartTime}ms`
+    );
+
+    const totalDuration = Date.now() - startTime;
+    console.log(`Total function execution completed in ${totalDuration}ms`);
 
     return {
       success: true,
       submission_id: submission_id,
       chunks_count: allChunks.length,
+      duration_ms: totalDuration,
     };
   } catch (error) {
-    console.error("Error in handleSubmission:", error);
+    const errorTime = Date.now();
+    console.error(`Error occurred after ${errorTime - startTime}ms:`, error);
 
     const {
       data: { user },
@@ -519,6 +563,8 @@ export async function handleSaveChunks(
         `Hey ${userName}, there was an issue with your recent submission on Cadence.`
       );
     }
+
+    throw error;
   }
 }
 
