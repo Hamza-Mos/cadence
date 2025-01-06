@@ -38,7 +38,6 @@ import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
 
 const FIVE_MB = 5 * 1024 * 1024;
-export const maxDuration = 300;
 
 // ----------------------
 // Zod Schema Definition
