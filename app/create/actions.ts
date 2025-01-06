@@ -113,7 +113,6 @@ const cleanText = (text: string): string => {
     .trim();
 };
 const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
-
   const gptModel = text.length > 120_000 ? "gpt-4o-mini" : "gpt-4o";
   console.log(`Using model: ${gptModel} to split text into chunks`);
 
@@ -273,7 +272,6 @@ async function isPublicUrl(url: string) {
 }
 
 export async function scrapeUrl(url: string) {
-
   const response = await fetch(url);
   const html = await response.text();
   const $ = cheerio.load(html);
@@ -285,7 +283,7 @@ export async function scrapeUrl(url: string) {
   $("iframe").remove();
   $("nav").remove();
   $("header").remove();
-  $("footer").remove();    
+  $("footer").remove();
   $(".comments").remove();
   $("#comments").remove();
   $("img").remove();
@@ -315,13 +313,15 @@ export async function scrapeUrl(url: string) {
   for (const selector of contentSelectors) {
     const content = $(selector).text();
     if (content) {
-      mainContent += '\n' + content;
+      mainContent += "\n" + content;
     }
   }
 
   // If no main content found, throw an error and ask user to copy-paste the text instead
   if (!mainContent) {
-    throw new Error("Sorry, we weren't able to find the content in the provided URL. Please try copy-pasting the content text instead.");
+    throw new Error(
+      "Sorry, we weren't able to find the content in the provided URL. Please try copy-pasting the content text instead."
+    );
   }
 
   const cleanedText = cleanText(mainContent);
@@ -368,7 +368,7 @@ export async function parsePdf(file: Buffer) {
     });
 
     const cleanedText = cleanText(data.text);
-    
+
     return cleanedText;
   } catch (error) {
     console.error("Error parsing PDF:", error);
@@ -388,7 +388,7 @@ export async function getUser() {
 }
 
 export async function handleSaveChunks(
-  allChunkPromises: Promise<string[]>[], 
+  allChunkPromises: Promise<string[]>[],
   submission_id: string,
   cadence: string,
   repeat: string,
@@ -398,16 +398,15 @@ export async function handleSaveChunks(
   files: File[],
   url?: string,
   youtube_url?: string,
-  raw_text?: string,
+  raw_text?: string
 ) {
   try {
-
     let allChunks: string[] = [];
     for (const chunkPromise of allChunkPromises) {
       const chunk = await chunkPromise;
       allChunks = [...allChunks, ...chunk];
     }
-    
+
     if (allChunks.length === 0) {
       throw new Error("No content was extracted from the provided source");
     }
@@ -517,7 +516,7 @@ export async function handleSaveChunks(
 
       await sendTextMessage(
         userPhone,
-        `Hey ${userName}, there was an issue with your recent submission on Cadence.\n\n${errorMsg}`
+        `Hey ${userName}, there was an issue with your recent submission on Cadence.`
       );
     }
   }
@@ -642,7 +641,6 @@ export async function handleSubmission(formData: FormData) {
       youtube_url,
       raw_text
     );
-
   } catch (error) {
     console.error("Error in processing submission:", error);
     throw error;
