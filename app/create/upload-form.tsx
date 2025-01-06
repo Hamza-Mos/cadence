@@ -28,9 +28,14 @@ import {
 import DropZoneUI from "@/components/dropzone";
 import FileTile from "@/components/filetile";
 import { handleSubmission } from "./actions";
-import { redirect } from "next/navigation";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
+import { useRouter } from "next/navigation";
 
 const FIVE_MB = 5 * 1024 * 1024;
 
@@ -136,6 +141,7 @@ export default function UploadForm({
 }: UploadFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   // React Hook Form initialization
   const form = useForm<z.infer<typeof FormSchema>>({
@@ -182,13 +188,7 @@ export default function UploadForm({
       await handleSubmission(formData);
       form.reset();
 
-      const response = await fetch("/api/submit", {
-        method: "GET",
-      });
-
-      if (response.status === 307 || response.redirected) {
-        window.location.href = response.headers.get("Location") || "/done";
-      }
+      router.push("/done");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       console.error("Submission error:", err);
@@ -242,11 +242,22 @@ export default function UploadForm({
                   <Input type="text" {...field} />
                 </FormControl>
                 <FormDescription>
-                  {"Paste any text, public URL (blogpost, article, etc.), or YouTube video URL."}&nbsp;<TooltipProvider>
+                  {
+                    "Paste any text, public URL (blogpost, article, etc.), or YouTube video URL."
+                  }
+                  &nbsp;
+                  <TooltipProvider>
                     <Tooltip>
-                      <TooltipTrigger><div className="h-full flex flex-col justify-around items-center"><InformationCircleIcon className="w-4 h-4"/></div></TooltipTrigger>
+                      <TooltipTrigger>
+                        <div className="h-full flex flex-col justify-around items-center">
+                          <InformationCircleIcon className="w-4 h-4" />
+                        </div>
+                      </TooltipTrigger>
                       <TooltipContent>
-                        <p>Public url is a url that is NOT behind a paywall or login.</p>
+                        <p>
+                          Public url is a url that is NOT behind a paywall or
+                          login.
+                        </p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -258,7 +269,6 @@ export default function UploadForm({
 
           <div className="w-full flex flex-row justify-around">AND/OR</div>
 
-          {/* Files Drop Zone Field */}
           <FormField
             control={form.control}
             name="files"
