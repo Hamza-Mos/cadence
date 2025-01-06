@@ -4,5 +4,6 @@
       "path": "/api/send-messages",
       "schedule": "*/30 * * * *"
     }
-  ]
+  ],
+  "regions": ["sfo1", "lhr1", "sin1"]
 }
