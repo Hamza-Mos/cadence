@@ -633,7 +633,8 @@ export async function handleSubmission(formData: FormData) {
         cadence,
         repeat,
         timezone: userData.timezone,
-        // message_to_send and first_message_id will be null by default
+        message_to_send: null,
+        first_message_id: null,
       });
 
     if (submissionError) throw submissionError;
