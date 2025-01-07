@@ -8,7 +8,10 @@ import * as cheerio from "cheerio";
 import { YoutubeTranscript } from "youtube-transcript";
 import pdfParse from "pdf-parse";
 import { SupabaseClient } from "@supabase/supabase-js";
-import { Database } from "@/lib/database.types"; // You'll need to generate this using Supabase CLI
+import { Database } from "@/lib/database.types";
+import { zodResponseFormat } from "openai/helpers/zod";
+import { traceable } from "langsmith/traceable";
+import { wrapOpenAI } from "langsmith/wrappers";
 
 // Type definitions
 type SubmissionResult = {
@@ -41,9 +44,11 @@ interface Submission {
 }
 
 // OpenAI configuration
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const openai = wrapOpenAI(
+  new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  })
+);
 
 // Zod schema for GPT response
 const TextMessages = z.object({
@@ -144,56 +149,88 @@ async function processUnprocessedSubmissions(
   }
 }
 
-async function splitIntoChunks(text: string): Promise<string[]> {
+const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
   const gptModel = text.length > 120_000 ? "gpt-4o-mini" : "gpt-4o";
+  console.log(`Using model: ${gptModel} to split text into chunks`);
 
-  const systemPrompt = `You are an expert at breaking down and explaining complex information...`; // Your existing prompt
+  const systemPrompt = `You are an expert at breaking down and explaining complex information. Break down the content given by a user seeking to understand the content into engaing text messages that will be delivered back to the user in timely intervals. Some rules to follow are:
+      1. Each text message must be around 4-5 sentences under 1000 characters total.
+      2. Make each text message focus on a single concept, topic, idea, or quote from the content.
+      3. Write in a text message style while keeping the information accurate.
+      4. Ensure each text message is self-contained and easily understood.
+      5. Use simple language and explanatory analogies where helpful.
+      6. Exclude any unnecessary information that may be present in the content. This includes information about the author, references, any small talk, introductory content etc. that doesn't have meaningful informational value to the reader.
+      7. Make the information memorable and easy to understand.
+      8. If the body of text is instructional, break it into clear, actionable steps.
+      9. Ignore any content related to appendix or index. Only generate messages on the main content of the material.
+      10. DO NOT EXCEED more than 5 messages in total.
+    
+    Output format should be a series of text messages. Do not include a message that only introduces the topic, remember each text message should have some informational value.
+  
+    Informational value can be determined based on the content. If its a blogpost or interview, capture the main essence, teachings and quotes. If its an academic paper, capture the main technique and results. If its a news article, capture the main events. and so on.
+    
+    For example, if given a technical article about photosynthesis, good text messages would be:
+     - "🌱 Here's something cool: plants are basically solar-powered! They take sunlight and turn it into food using their leaves. The green color you see is from chlorophyll, which is like tiny solar panels inside the leaves."
+     - "💧 Water plays a huge role in photosynthesis! Plants drink it up from their roots and combine it with CO2 from the air. This chemical reaction helps create glucose - basically plant food!"
+    `;
 
   try {
-    const maxCharsPerRequest = 20000;
-    const textSegments: string[] = [];
+    // Split text into smaller segments if it's too long
+    const maxCharsPerRequest = 20000; // Safe limit for context window
+    const textSegments = [];
     for (let i = 0; i < text.length; i += maxCharsPerRequest) {
       textSegments.push(text.slice(i, i + maxCharsPerRequest));
     }
 
     let allChunks: string[] = [];
 
+    // Process each segment
     for (const segment of textSegments) {
-      const completion = await openai.chat.completions.create({
+      const completion = await openai.beta.chat.completions.parse({
         model: gptModel,
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: segment },
+          {
+            role: "system",
+            content: systemPrompt,
+          },
+          {
+            role: "user",
+            content: `${segment}`,
+          },
         ],
         temperature: 0.7,
         max_tokens: 2000,
-        response_format: { type: "json_object" } as const,
+        response_format: zodResponseFormat(TextMessages, "messages"),
       });
 
-      const response = completion.choices[0].message;
-      if (!response?.content) continue;
+      const response = completion.choices[0].message.parsed;
 
-      try {
-        const parsedResponse = JSON.parse(response.content) as TextMessagesType;
-        const newChunks = parsedResponse.text_messages
-          .map((chunk) => chunk.trim())
-          .filter((chunk) => chunk.length > 0);
-        allChunks = [...allChunks, ...newChunks];
-      } catch (e) {
-        console.error("Error parsing GPT response:", e);
+      if (!response) {
+        console.warn("No response from GPT for segment");
+        continue;
       }
+
+      // Split response into chunks and add to collection
+      const newChunks = response.text_messages
+        .map((chunk) => chunk.trim())
+        .filter((chunk) => chunk.length > 0);
+      allChunks = [...allChunks, ...newChunks];
     }
 
     // Validate chunks
-    allChunks = allChunks.filter(
-      (chunk) =>
+    allChunks = allChunks.filter((chunk) => {
+      // Ensure each chunk is within size limits and has actual content
+      return (
         chunk.length > 0 &&
-        chunk.length <= 1000 &&
+        chunk.length <= 1000 && // Match database constraint
         chunk.split(/[.!?]+/).length >= 2 &&
         !chunk.slice(0, 10).toLowerCase().includes("i'm sorry")
-    );
+      ); // At least 2 sentences
+    });
 
     if (allChunks.length === 0) {
+      // Fallback to simple chunking if GPT fails
+      console.warn("GPT chunking failed, falling back to simple chunking");
       return text
         .split(/[.!?]+/)
         .reduce((acc: string[], sentence: string, i: number) => {
@@ -204,12 +241,22 @@ async function splitIntoChunks(text: string): Promise<string[]> {
         .filter((chunk) => chunk.trim().length > 0);
     }
 
+    console.log("All chunks:", allChunks);
+
     return allChunks;
   } catch (error) {
     console.error("Error in GPT text chunking:", error);
-    throw error;
+    // Fallback to simple chunking
+    return text
+      .split(/[.!?]+/)
+      .reduce((acc: string[], sentence: string, i: number) => {
+        if (i % 3 === 0) acc.push(sentence + ".");
+        else if (acc.length > 0) acc[acc.length - 1] += " " + sentence + ".";
+        return acc;
+      }, [])
+      .filter((chunk) => chunk.trim().length > 0);
   }
-}
+});
 
 async function processSubmission(
   supabase: SupabaseClient<Database>,
