@@ -15,6 +15,10 @@ import { processMessages } from "@/utils/messages";
 import { YoutubeTranscript } from "youtube-transcript";
 import { sendTextMessage } from "@/utils/twilio";
 
+export const config = {
+  maxDuration: 300,
+};
+
 const openai = wrapOpenAI(
   new OpenAI({
     apiKey: process.env.OPENAI_API_KEY,
