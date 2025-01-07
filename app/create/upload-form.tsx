@@ -367,7 +367,7 @@ export default function UploadForm({
               );
 
               // Log the current error (helpful if the UI won't show it)
-              console.log("file error:", fieldState.error);
+              // console.log("file error:", fieldState.error);
 
               return (
                 <FormItem>
