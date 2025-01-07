@@ -96,7 +96,7 @@ async function processUnprocessedSubmissions(
       .from("submissions")
       .select("*")
       .is("message_to_send", null)
-      .limit(5)) as { data: Submission[] | null; error: any };
+      .limit(5)) as { data: Submission[] | null; error: any }; // to avoid timeouts (can maybe change this with no limit??)
 
     if (error) throw error;
 
@@ -108,6 +108,7 @@ async function processUnprocessedSubmissions(
     for (const submission of submissions) {
       try {
         await processSubmission(supabase, submission);
+        console.log("Processed submission with id: ", submission.submission_id);
         results.push({ id: submission.submission_id, status: "success" });
       } catch (error) {
         console.error(
