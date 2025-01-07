@@ -185,10 +185,12 @@ export default function UploadForm({
       formData.append("cadence", data.cadence);
       formData.append("repeat", data.repeat);
 
-      await handleSubmission(formData);
-      form.reset();
+      const result = await handleSubmission(formData);
 
-      router.push("/done");
+      if (result.success) {
+        form.reset();
+        router.push("/done");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
       console.error("Submission error:", err);
