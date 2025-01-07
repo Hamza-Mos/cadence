@@ -583,8 +583,6 @@ export async function handleSubmission(formData: FormData) {
     } = await supabase.auth.getUser();
     if (!user) throw new Error("Not authenticated");
 
-    let allChunkPromises: Promise<string[]>[] = [];
-
     const canSubmit = await checkUserCanSubmit(supabase, user.id);
     if (!canSubmit) {
       throw new Error(
@@ -604,17 +602,15 @@ export async function handleSubmission(formData: FormData) {
     // Generate a submission ID
     const submission_id = randomUUID();
 
-    // Handle file uploads
+    // Handle file uploads if any
     if (files.length > 0) {
       const folderPath = `${user.id}/${submission_id}`;
 
-      // Upload each file and get signed URLs
       for (const file of files) {
         const buffer = Buffer.from(await file.arrayBuffer());
         const filePath = `${folderPath}/${file.name}`;
 
-        // Upload the file
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
           .from("attachments")
           .upload(filePath, buffer, {
             contentType: file.type,
@@ -622,73 +618,29 @@ export async function handleSubmission(formData: FormData) {
           });
 
         if (uploadError) throw uploadError;
-
-        // Get a signed URL for the uploaded file
-        const { data: signedUrlData, error: signedUrlError } =
-          await supabase.storage
-            .from("attachments")
-            .createSignedUrl(filePath, 60 * 60); // 1 hour expiry
-
-        if (signedUrlError || !signedUrlData?.signedUrl) throw signedUrlError;
-
-        // Use the signed URL to access the file
-        const fileResponse = await fetch(signedUrlData.signedUrl);
-        const fileBuffer = Buffer.from(await fileResponse.arrayBuffer());
-        const cleanedText = await parsePdf(fileBuffer);
-        const pdfChunks = splitIntoChunks(cleanedText);
-        allChunkPromises = [...allChunkPromises, pdfChunks];
       }
     }
 
-    // Process YouTube URL if provided
-    if (youtube_url?.trim()) {
-      const publicCheck = await isPublicUrl(youtube_url.trim());
-      if (!publicCheck) {
-        throw new Error(
-          "The provided YouTube URL appears to be restricted or private."
-        );
-      }
+    // Create initial submission record
+    // Note: message_to_send is null by default, which indicates it needs processing
+    const { error: submissionError } = await supabase
+      .from("submissions")
+      .insert({
+        submission_id,
+        user_id: user.id,
+        text_field: youtube_url?.trim() || url?.trim() || raw_text || null,
+        uploaded_files: files.map((file) => file.name),
+        cadence,
+        repeat,
+        timezone: userData.timezone,
+        // message_to_send and first_message_id will be null by default
+      });
 
-      const youtubeTranscript = await processYouTubeUrl(youtube_url);
-      const youtubeChunks = splitIntoChunks(cleanText(youtubeTranscript));
-      allChunkPromises = [...allChunkPromises, youtubeChunks];
-    }
+    if (submissionError) throw submissionError;
 
-    // Process URL if provided
-    if (url?.trim()) {
-      const publicCheck = await isPublicUrl(url.trim());
-      if (!publicCheck) {
-        throw new Error(
-          "The provided URL appears to be restricted or behind a paywall."
-        );
-      }
-      console.log("Scraping URL:", url);
-      const cleanedText = await scrapeUrl(url);
-      const urlChunks = splitIntoChunks(cleanedText);
-      allChunkPromises = [...allChunkPromises, urlChunks];
-    }
-
-    // Process raw text if provided
-    if (raw_text) {
-      const textChunks = splitIntoChunks(cleanText(raw_text));
-      allChunkPromises = [...allChunkPromises, textChunks];
-    }
-
-    await handleSaveChunks(
-      allChunkPromises,
-      submission_id,
-      cadence,
-      repeat,
-      userData,
-      supabase,
-      user,
-      files,
-      url,
-      youtube_url,
-      raw_text
-    );
+    return { success: true, submission_id };
   } catch (error) {
-    console.error("Error in processing submission:", error);
+    console.error("Error in submission:", error);
     throw error;
   }
 }

@@ -14,6 +14,7 @@ const CADENCE_HOURS: CadenceMap = {
 };
 
 interface Message {
+  submission_id: any;
   message_id: string;
   message_text: string;
   next_message_to_send: string;

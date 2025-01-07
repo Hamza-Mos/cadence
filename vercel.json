@@ -3,6 +3,10 @@
     {
       "path": "/api/send-messages",
       "schedule": "*/30 * * * *"
+    },
+    {
+      "path": "/api/process-messages",
+      "schedule": "*/10 * * * *"
     }
   ],
   "regions": ["sfo1", "lhr1", "sin1"]

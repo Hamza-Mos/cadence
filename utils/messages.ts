@@ -2,7 +2,6 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { sendTextMessage } from "@/utils/twilio";
 import {
   getCurrentMessage,
-  getSubmissionsForProcessing,
   shouldSendMessage,
   updateAfterSend,
 } from "@/utils/submissions";
@@ -50,6 +49,9 @@ export async function processMessages(
             `
         )
         .eq("submission_id", options.submissionId)
+        // Safety checks for fully processed submissions
+        .not("message_to_send", "is", null) // Must have a message to send
+        .not("first_message_id", "is", null) // Must have first message set
         .single();
 
       if (error) {
@@ -58,20 +60,29 @@ export async function processMessages(
       }
 
       if (!data) {
-        throw new Error(`Submission not found: ${options.submissionId}`);
+        throw new Error(
+          `Submission not found or not ready: ${options.submissionId}`
+        );
       }
 
       submissions = [data];
     } else {
       // Get all submissions
-      const { data, error } = await supabase.from("submissions").select(`
+      const { data, error } = await supabase
+        .from("submissions")
+        .select(
+          `
               *,
               users!inner (
                 area_code,
                 phone_number,
                 timezone
               )
-            `);
+            `
+        )
+        // Safety checks for fully processed submissions
+        .not("message_to_send", "is", null) // Must have a message to send
+        .not("first_message_id", "is", null); // Must have first message set
 
       if (error) throw error;
       submissions = data || [];
@@ -102,7 +113,7 @@ export async function processMessages(
           continue;
         }
 
-        // Get current message details
+        // Double-check current message exists (extra safety)
         const currentMessage = await getCurrentMessage(
           supabase,
           submission.message_to_send
@@ -110,6 +121,13 @@ export async function processMessages(
 
         if (!currentMessage) {
           throw new Error(`Message not found: ${submission.message_to_send}`);
+        }
+
+        // Verify message belongs to this submission (extra safety)
+        if (currentMessage.submission_id !== submission.submission_id) {
+          throw new Error(
+            `Message ${submission.message_to_send} does not belong to submission ${submission.submission_id}`
+          );
         }
 
         // Send the message
