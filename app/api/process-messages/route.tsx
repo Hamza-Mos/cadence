@@ -122,6 +122,39 @@ async function processUnprocessedSubmissions(
           error: errorMessage,
         });
 
+        // Delete the failed submission
+        const { error: deleteError } = await supabase
+          .from("submissions")
+          .delete()
+          .eq("submission_id", submission.submission_id);
+
+        if (deleteError) {
+          console.error("Error deleting failed submission:", deleteError);
+        }
+
+        // Get submission type and details
+        let submissionType = "content";
+        let submissionDetail = "";
+
+        if (submission.text_field) {
+          if (
+            submission.text_field.includes("youtube.com") ||
+            submission.text_field.includes("youtu.be")
+          ) {
+            submissionType = "YouTube video";
+            submissionDetail = submission.text_field;
+          } else if (submission.text_field.startsWith("http")) {
+            submissionType = "article/URL";
+            submissionDetail = submission.text_field;
+          } else {
+            submissionType = "text";
+          }
+        } else if (submission.uploaded_files?.length) {
+          submissionType =
+            "PDF" + (submission.uploaded_files.length > 1 ? "s" : "");
+          submissionDetail = submission.uploaded_files.join(", ");
+        }
+
         // Notify user of error
         const { data: userData } = (await supabase
           .from("users")
@@ -131,9 +164,23 @@ async function processUnprocessedSubmissions(
 
         if (userData?.phone_number) {
           const userName = userData.first_name || "there";
+          let errorMessage = `Hey ${userName}, there was an issue processing your recent ${submissionType} submission on Cadence.`;
+
+          if (submissionDetail) {
+            // Truncate long URLs/filenames to keep message readable
+            const truncatedDetail =
+              submissionDetail.length > 50
+                ? submissionDetail.substring(0, 47) + "..."
+                : submissionDetail;
+            errorMessage += `\n\nSubmission: ${truncatedDetail}`;
+          }
+
+          errorMessage +=
+            "\n\nThe submission has been removed - please try submitting again. If the issue persists, contact support.";
+
           await sendTextMessage(
             `+${userData.area_code}${userData.phone_number}`,
-            `Hey ${userName}, there was an issue processing your recent submission on Cadence. Please try again or contact support if the issue persists.`
+            errorMessage
           );
         }
       }
