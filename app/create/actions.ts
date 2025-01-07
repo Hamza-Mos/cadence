@@ -96,6 +96,15 @@ function generateStartTime(
   return finalTime;
 }
 
+function getCurrentTime(timezone: string): Date {
+  // Get current date in user's timezone
+  const now = new Date();
+  const userNow = new Date(now.toLocaleString("en-US", { timeZone: timezone }));
+
+  // Calculate minimum time based on cadence
+  return new Date(userNow);
+}
+
 const cleanText = (text: string): string => {
   return text
     .replace(/\s+/g, " ") // Replace multiple spaces with single space
@@ -635,6 +644,7 @@ export async function handleSubmission(formData: FormData) {
         timezone: userData.timezone,
         message_to_send: null,
         first_message_id: null,
+        start_time: getCurrentTime(userData.timezone),
       });
 
     if (submissionError) throw submissionError;
