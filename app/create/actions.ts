@@ -674,7 +674,7 @@ export async function handleSubmission(formData: FormData) {
       allChunkPromises = [...allChunkPromises, textChunks];
     }
 
-    handleSaveChunks(
+    await handleSaveChunks(
       allChunkPromises,
       submission_id,
       cadence,
