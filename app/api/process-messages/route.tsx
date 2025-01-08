@@ -80,8 +80,15 @@ export async function GET(request: NextRequest): Promise<Response> {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const startTime = Date.now();
+  console.log("Starting job at:", new Date(startTime).toISOString());
+
   const supabase = createServiceClient();
   const result = await processUnprocessedSubmissions(supabase);
+
+  const endTime = Date.now();
+  const duration = (endTime - startTime) / 1000; // in seconds
+  console.log("Job completed in:", duration, "seconds");
 
   return Response.json(result, {
     status: result.success ? 200 : 500,
@@ -96,7 +103,11 @@ async function processUnprocessedSubmissions(
       .from("submissions")
       .select("*")
       .is("message_to_send", null)
-      .limit(5)) as { data: Submission[] | null; error: any }; // to avoid timeouts (can maybe change this with no limit??)
+      .order("created_at", { ascending: true })
+      .limit(20)) as {
+      data: Submission[] | null;
+      error: any;
+    };
 
     if (error) throw error;
 
