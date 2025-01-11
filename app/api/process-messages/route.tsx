@@ -108,7 +108,7 @@ async function processUnprocessedSubmissions(
       .select("*")
       .is("message_to_send", null)
       .order("created_at", { ascending: true })
-      .limit(20)) as {
+      .limit(5)) as {
       data: Submission[] | null;
       error: any;
     };
