@@ -359,7 +359,12 @@ async function processSubmission(
       const transcriptResponse = await fetch(
         `https://web-production-5d97.up.railway.app/transcript?url=${encodeURIComponent(
           submission.text_field
-        )}`
+        )}`,
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.TRANSCRIPT_SERVICE_API_KEY!}`,
+          },
+        }
       );
 
       if (!transcriptResponse.ok) {
