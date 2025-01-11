@@ -43,6 +43,10 @@ interface Submission {
   first_message_id: string | null;
 }
 
+interface TranscriptResponse {
+  transcript: string;
+}
+
 // OpenAI configuration
 const openai = wrapOpenAI(
   new OpenAI({
@@ -352,10 +356,19 @@ async function processSubmission(
       submission.text_field.includes("youtube.com") ||
       submission.text_field.includes("youtu.be")
     ) {
-      const transcript = await YoutubeTranscript.fetchTranscript(
-        submission.text_field
+      const transcriptResponse = await fetch(
+        `https://web-production-5d97.up.railway.app/transcript?url=${encodeURIComponent(
+          submission.text_field
+        )}`
       );
-      cleanedText = transcript.map((entry) => entry.text).join(" ");
+
+      if (!transcriptResponse.ok) {
+        const error = await transcriptResponse.json();
+        throw new Error(`Failed to fetch transcript: ${error.error}`);
+      }
+
+      const data = (await transcriptResponse.json()) as TranscriptResponse;
+      cleanedText = data.transcript;
     } else if (submission.text_field.startsWith("http")) {
       const response = await fetch(submission.text_field);
       const html = await response.text();
