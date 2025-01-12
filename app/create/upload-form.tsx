@@ -431,7 +431,7 @@ export default function UploadForm({
                     <SelectContent>
                       <SelectGroup>
                         <SelectLabel>Cadence</SelectLabel>
-                        <SelectItem value="receive-daily">day</SelectItem>
+                        <SelectItem value="receive-daily">Day</SelectItem>
                         <SelectItem value="receive-12">
                           12 hours
                         </SelectItem>
@@ -472,9 +472,9 @@ export default function UploadForm({
                           value="repeat-forever"
                           disabled={!isSubscribed}
                         >
-                          forever {!isSubscribed && "(Pro ✨)"}
+                          Forever {!isSubscribed && "(Pro ✨)"}
                         </SelectItem>
-                        <SelectItem value="do-not-repeat">never</SelectItem>
+                        <SelectItem value="do-not-repeat">Never</SelectItem>
                       </SelectGroup>
                     </SelectContent>
                   </Select>
