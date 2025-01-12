@@ -16,7 +16,7 @@ export const metadata = {
   metadataBase: new URL(defaultUrl),
   title: "Cadence: Microlearning made easy!",
   description:
-    "Supercharge your microlearning with byte-sized texts using Cadence!",
+    "Supercharge your microlearning with bite-sized texts using Cadence!",
 };
 
 export default function RootLayout({
