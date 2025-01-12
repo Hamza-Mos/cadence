@@ -622,7 +622,7 @@ export async function handleSubmission(formData: FormData): Promise<{ success: b
       try {
         await scrapeUrl(url);
       } catch (error: any) {
-        return { success: false, error: error };
+        return { success: false, error: "There was an issue processing the URL. Please try copy-pasting the content text instead." };
       }
     }
 
