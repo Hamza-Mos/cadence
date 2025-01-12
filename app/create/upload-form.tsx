@@ -278,33 +278,16 @@ export default function UploadForm({
               // Handle valid file drops
               const onDrop = useCallback(
                 (acceptedFiles: File[]) => {
+                  const currentItems = form.getValues("files") || [];
+
                   const validFiles = acceptedFiles.filter(
                     (file) =>
-                      file.type === "application/pdf" && file.size <= FIVE_MB
+                      file.type === "application/pdf" &&
+                      !currentItems.some(
+                        (f) => f.name === file.name
+                      )
                   );
-
-                  const currentItems = form.getValues("files") || [];
                   const newFiles = [...currentItems, ...validFiles];
-
-                  // Max 3 files
-                  if (newFiles.length > 3) {
-                    form.setError("files", {
-                      type: "manual",
-                      message: "You can only upload up to 3 files",
-                    });
-                    return;
-                  }
-
-                  // No duplicates
-                  const fileNames = newFiles.map((f) => f.name);
-                  if (new Set(fileNames).size !== fileNames.length) {
-                    form.setError("files", {
-                      type: "manual",
-                      message: "Duplicate files are not allowed",
-                    });
-                    return;
-                  }
-
                   // Set new files
                   form.setValue("files", newFiles);
                   // Trigger validation so Zod checks as well
@@ -332,8 +315,6 @@ export default function UploadForm({
               const { getRootProps, getInputProps, isDragActive } = useDropzone(
                 {
                   onDrop,
-                  maxSize: FIVE_MB,
-                  maxFiles: 3,
                   accept: {
                     "application/pdf": [".pdf"],
                   },
