@@ -594,9 +594,7 @@ export async function handleSubmission(formData: FormData) {
 
     const canSubmit = await checkUserCanSubmit(supabase, user.id);
     if (!canSubmit) {
-      throw new Error(
-        `Submission limit ${MAX_FREE_SUBMISSIONS} reached. Subscribe to Pro ✨.`
-      );
+      return { success: false, error: "You've hit the submission limit. Get Pro ✨ for unlimited submissions." };
     }
 
     // Get user's timezone

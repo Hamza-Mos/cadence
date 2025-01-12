@@ -190,6 +190,8 @@ export default function UploadForm({
       if (result.success) {
         form.reset();
         router.push("/done");
+      } else {
+        throw new Error(result.error);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
@@ -401,10 +403,10 @@ export default function UploadForm({
                       <SelectGroup>
                         <SelectLabel>Cadence</SelectLabel>
                         <SelectItem value="receive-daily">day</SelectItem>
-                        <SelectItem value="receive-12" disabled={!isSubscribed}>
+                        <SelectItem value="receive-12">
                           12 hours
                         </SelectItem>
-                        <SelectItem value="receive-6" disabled={!isSubscribed}>
+                        <SelectItem value="receive-6">
                           6 hours
                         </SelectItem>
                         <SelectItem value="receive-1" disabled={!isSubscribed}>
