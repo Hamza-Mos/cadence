@@ -621,8 +621,8 @@ export async function handleSubmission(formData: FormData): Promise<{ success: b
     if (url?.trim()) {
       try {
         await scrapeUrl(url);
-      } catch (error) {
-        return { success: false, error: error as string };
+      } catch (error: any) {
+        return { success: false, error: error };
       }
     }
 
