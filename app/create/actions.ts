@@ -230,28 +230,17 @@ const splitIntoChunks = traceable(async (text: string): Promise<string[]> => {
   }
 });
 
-async function processYouTubeUrl(url: string): Promise<string> {
-  try {
-    // Extract video ID from URL
-    const videoId = url.match(
-      /(?:youtu\.be\/|youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
-    )?.[1];
+function isValidYouTubeUrl(url: string): boolean {
+  // Extract video ID from URL
+  const videoId = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/
+  )?.[1];
 
-    if (!videoId) {
-      throw new Error("Invalid YouTube URL");
-    }
-
-    // Get transcript
-    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
-    const fullText = getTranscriptText(transcript);
-
-    return fullText;
-  } catch (error) {
-    console.error("Error processing YouTube URL:", error);
-    throw new Error(
-      "Failed to process YouTube video transcript because transcription is disabled on this video. Please try a different video that has transcription enabled."
-    );
+  if (!videoId) {
+    return false;
   }
+
+  return true;
 }
 
 function getTranscriptText(transcript: any[]) {
@@ -329,7 +318,7 @@ export async function scrapeUrl(url: string) {
   // If no main content found, throw an error and ask user to copy-paste the text instead
   if (!mainContent) {
     throw new Error(
-      "Sorry, we weren't able to find the content in the provided URL. Please try copy-pasting the content text instead."
+      "Sorry, we were unable to find the content in the provided URL. Please try copy-pasting the content text instead."
     );
   }
 
@@ -625,6 +614,23 @@ export async function handleSubmission(formData: FormData) {
           });
 
         if (uploadError) throw uploadError;
+      }
+    }
+
+    // if url, try scraping it to throw error if it fails
+    if (url?.trim()) {
+      try {
+        await scrapeUrl(url);
+      } catch (error) {
+        return { success: false, error: error };
+      }
+    }
+
+    // if youtube_url, check if it's a valid YouTube URL
+    if (youtube_url?.trim()) {
+      const isValid = isValidYouTubeUrl(youtube_url);
+      if (!isValid) {
+        return { success: false, error: "Invalid YouTube URL. Make sure the pasted URL is correct." };
       }
     }
 
