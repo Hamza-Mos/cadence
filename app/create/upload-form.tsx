@@ -36,6 +36,8 @@ import {
 } from "@/components/ui/tooltip";
 import { InformationCircleIcon } from "@heroicons/react/24/outline";
 import { useRouter } from "next/navigation";
+import { v4 as uuidv4 } from 'uuid';
+import { createClient } from "@/utils/supabase/client";
 
 const FIVE_MB = 5 * 1024 * 1024;
 
@@ -162,8 +164,13 @@ export default function UploadForm({
       setIsSubmitting(true);
       setError(null);
 
+      const supabase = createClient();
+      const user = await supabase.auth.getUser();
+
       const formData = new FormData();
       const textContent = data.text?.trim() || "";
+      const submission_id = uuidv4();
+      formData.append("submission_id", submission_id);
 
       // Distinguish text vs. URL vs. YouTube
       if (textContent) {
@@ -176,9 +183,31 @@ export default function UploadForm({
         }
       }
 
-      // Attach files
-      for (const file of data.files) {
-        formData.append("files", file);
+      if (!user.data.user?.id) {
+        router.push("/sign-in");
+      }
+
+      const folderPath = `${user.data.user?.id}/${submission_id}`;
+
+      // Handle file uploads if any
+      if (data.files.length > 0) {
+        let fileNames: string[] = [];
+        for (const file of data.files) {
+          const buffer = Buffer.from(await file.arrayBuffer());
+          const filePath = `${folderPath}/${file.name}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from("attachments")
+            .upload(filePath, buffer, {
+              contentType: file.type,
+              cacheControl: "3600",
+            });
+
+          if (uploadError) throw uploadError;
+
+          fileNames = [...fileNames, file.name];
+        }
+        formData.append("files", JSON.stringify(fileNames));
       }
 
       // Additional fields

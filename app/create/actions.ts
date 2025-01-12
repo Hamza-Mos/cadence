@@ -568,10 +568,11 @@ export async function handleSaveChunks(
 
 export async function handleSubmission(formData: FormData): Promise<{ success: boolean, error?: string, submission_id?: string }> {
   const supabase = await createClient();
+  const submission_id = formData.get("submission_id") as string | undefined;
   const url = formData.get("url") as string | undefined;
   const youtube_url = formData.get("youtube_url") as string | undefined;
   const raw_text = formData.get("raw_text") as string | undefined;
-  const files = formData.getAll("files") as File[];
+  const file_names = JSON.parse(formData.get("files") as string) as string[];
   const cadence = formData.get("cadence") as string;
   const repeat = formData.get("repeat") as string;
 
@@ -594,28 +595,6 @@ export async function handleSubmission(formData: FormData): Promise<{ success: b
       .single();
 
     if (userError) throw userError;
-
-    // Generate a submission ID
-    const submission_id = randomUUID();
-
-    // Handle file uploads if any
-    if (files.length > 0) {
-      const folderPath = `${user.id}/${submission_id}`;
-
-      for (const file of files) {
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const filePath = `${folderPath}/${file.name}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("attachments")
-          .upload(filePath, buffer, {
-            contentType: file.type,
-            cacheControl: "3600",
-          });
-
-        if (uploadError) throw uploadError;
-      }
-    }
 
     // if url, try scraping it to throw error if it fails
     if (url?.trim()) {
@@ -642,7 +621,7 @@ export async function handleSubmission(formData: FormData): Promise<{ success: b
         submission_id,
         user_id: user.id,
         text_field: youtube_url?.trim() || url?.trim() || raw_text || null,
-        uploaded_files: files.map((file) => file.name),
+        uploaded_files: file_names,
         cadence,
         repeat,
         timezone: userData.timezone,

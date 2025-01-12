@@ -25,6 +25,18 @@ interface ManageTileProps {
   created: Date;
 }
 
+const CADENCE_MAP: { [key: string]: string } = {
+  "receive-daily": "Daily",
+  "receive-12": "12 hours",
+  "receive-6": "6 hours",
+  "receive-1": "1 hour"
+}
+
+const REPEAT_MAP: { [key: string]: string } = {
+  "repeat-forever": "Forever",
+  "do-not-repeat": "Never",
+}
+
 function formatDate(date: Date): string {
   // Extract the components of the date
   let year = date.getFullYear().toString().slice(-2); // Get last two digits of the year
@@ -40,6 +52,25 @@ function formatDate(date: Date): string {
 
   // Combine the parts into the desired format
   return `${month}/${day}/${year} at ${time}`;
+}
+
+function truncateFileName(fileName: string): string {
+  const maxLength = 40;
+    // If filename is already shorter than max length, return as is
+    if (fileName.length <= maxLength) {
+      return fileName;
+    }
+  
+    // Split filename into name and extension
+    const lastDotIndex = fileName.lastIndexOf('.');
+    const name = fileName.slice(0, lastDotIndex);
+    const extension = fileName.slice(lastDotIndex);
+  
+    // Calculate how much of the name we can keep
+    const availableLength = maxLength - extension.length - 3; // 3 for "..."
+    const truncatedName = name.slice(0, availableLength);
+  
+    return `${truncatedName}...${extension}`;
 }
 
 export default function ManageTile({
@@ -64,7 +95,7 @@ export default function ManageTile({
               {uploadedFiles.map((file) => (
                 <div key={file}>
                   <FileTile
-                    filename={file}
+                    filename={truncateFileName(file)}
                     filesize={undefined}
                     onDelete={undefined}
                   />
@@ -75,7 +106,7 @@ export default function ManageTile({
               <Label htmlFor="framework">Cadence</Label>
               <Select>
                 <SelectTrigger id="framework">
-                  <SelectValue placeholder={cadence} />
+                  <SelectValue placeholder={CADENCE_MAP[cadence]} />
                 </SelectTrigger>
               </Select>
             </div>
@@ -83,7 +114,7 @@ export default function ManageTile({
               <Label htmlFor="framework">Repeat</Label>
               <Select>
                 <SelectTrigger id="framework">
-                  <SelectValue placeholder={repeat} />
+                  <SelectValue placeholder={REPEAT_MAP[repeat]} />
                 </SelectTrigger>
               </Select>
             </div>
