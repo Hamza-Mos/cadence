@@ -566,7 +566,7 @@ export async function handleSaveChunks(
   }
 }
 
-export async function handleSubmission(formData: FormData) {
+export async function handleSubmission(formData: FormData): Promise<{ success: boolean, error?: string, submission_id?: string }> {
   const supabase = await createClient();
   const url = formData.get("url") as string | undefined;
   const youtube_url = formData.get("youtube_url") as string | undefined;
@@ -622,7 +622,7 @@ export async function handleSubmission(formData: FormData) {
       try {
         await scrapeUrl(url);
       } catch (error) {
-        return { success: false, error: error };
+        return { success: false, error: error as string };
       }
     }
 
