@@ -621,7 +621,7 @@ export async function handleSubmission(formData: FormData): Promise<{ success: b
         submission_id,
         user_id: user.id,
         text_field: youtube_url?.trim() || url?.trim() || raw_text || null,
-        uploaded_files: file_names,
+        uploaded_files: file_names ?? [],
         cadence,
         repeat,
         timezone: userData.timezone,

@@ -92,7 +92,7 @@ export default function ManageTile({
             <div className="flex flex-col space-y-1.5">
               <Label htmlFor="name">Content</Label>
               <Input id="name" placeholder={textField} readOnly />
-              {uploadedFiles.map((file) => (
+              {uploadedFiles && uploadedFiles.map((file) => (
                 <div key={file}>
                   <FileTile
                     filename={truncateFileName(file)}
